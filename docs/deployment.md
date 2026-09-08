@@ -6,7 +6,9 @@
 
 - Docker Engine
 - Docker Compose v2（`docker compose`）
-- 可执行 `docker compose`、`curl` 的 SSH 用户
+- 可执行 `docker compose`、`curl` 的 SSH 用户（本项目为 `TonyAdmin`，需加入 `docker` 组以具备执行 docker 的权限）
+- 允许 SSH 密码登录（`sshd_config` 中 `PasswordAuthentication yes`）
+- 部署目录 `/opt/wecom-ai-customer-service`，属主为部署用户
 - 已配置 `ghcr.io` 拉取权限（如私有镜像则需 `docker login ghcr.io`）
 
 ## 2. 生产 Compose 组件
@@ -40,26 +42,38 @@ curl -f http://127.0.0.1:8000/health
 | 名称 | 用途 |
 |---|---|
 | `SERVER_HOST` | 部署服务器地址 |
-| `SERVER_USER` | SSH 用户 |
-| `SERVER_SSH_KEY` | SSH 私钥 |
+| `SERVER_USER` | SSH 用户，例如 `TonyAdmin` |
+| `SERVER_PASSWORD` | SSH 登录密码，CD 通过 `sshpass -e` 使用 |
 | `SERVER_KNOWN_HOSTS` | 服务器 host key，启用严格校验 |
-| `DEPLOY_PATH` | 服务器部署目录 |
+| `DEPLOY_PATH` | 服务器部署目录，例如 `/opt/wecom-ai-customer-service` |
 | `MYSQL_PASSWORD` | MySQL 应用账号密码 |
 | `MYSQL_ROOT_PASSWORD` | MySQL root 密码 |
 | `LLM_API_KEY` | 真实模型密钥（可留空则使用 Fake） |
 | `EMBEDDING_API_KEY` | 真实 embedding 密钥（可留空） |
 | `WECOM_CORP_ID` / `WECOM_SECRET` / `WECOM_TOKEN` / `WECOM_AES_KEY` | 企业微信占位凭证 |
 
-### 4.2 推荐 Variables
+### 4.2 获取 `SERVER_KNOWN_HOSTS`
 
-`APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_BASE_URL`、`LLM_MODEL`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`DEFAULT_TENANT_*`。
+在可信网络中执行，并核对指纹：
+
+```bash
+ssh-keyscan -p 22 -t ed25519,rsa <SERVER_HOST>
+```
+
+将输出整体写入 `SERVER_KNOWN_HOSTS`。`SERVER_KNOWN_HOSTS` 是必需 Secret：密码认证只证明客户端身份，不校验服务器身份，关闭 host key 校验会带来中间人风险。
+
+> 安全提示：密码登录弱于密钥登录，密码可能被暴力破解且无法细粒度回收。当前按需求使用密码模式，建议后续迁移到 GitHub Actions 专用 SSH key。切勿把服务器密码写入仓库、文档或工作流日志。
+
+### 4.3 推荐 Variables
+
+`SERVER_SSH_PORT`（默认 `22`）、`APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_BASE_URL`、`LLM_MODEL`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`DEFAULT_TENANT_*`。
 
 ## 5. 更新发布
 
 CD 工作流执行顺序：
 
 1. 构建镜像并推送 GHCR；
-2. 通过 SSH 严格 host key 校验连到服务器；
+2. 安装 `sshpass`，使用 `SSHPASS` 环境变量 + 严格 host key 校验以密码方式连到服务器；
 3. 上传最新 `docker-compose.yml`；
 4. 生成/更新服务器 `.env`；
 5. `docker compose pull app migrate`；
