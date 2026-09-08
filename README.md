@@ -66,13 +66,12 @@ curl -f http://127.0.0.1:8000/health
 |---|---|
 | `SERVER_HOST` / `SERVER_USER` | 部署服务器地址与 SSH 用户（如 `TonyAdmin`） |
 | `SERVER_PASSWORD` | SSH 登录密码（配合 `sshpass` 使用） |
-| `SERVER_KNOWN_HOSTS` | 服务器 host key，`ssh-keyscan` 获取，用于严格 host key 校验 |
-| `DEPLOY_PATH` | 服务器部署目录 |
+| `DEPLOY_PATH` | 服务器部署目录（统一为 `/opt/wecom-ai-customer-service`） |
 | `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD` | MySQL 密码 |
 | `LLM_API_KEY` / `EMBEDDING_API_KEY` | 模型密钥 |
 | `WECOM_CORP_ID` / `WECOM_SECRET` / `WECOM_TOKEN` / `WECOM_AES_KEY` | 企业微信占位凭证 |
 
-> CD 使用 SSH 密码登录（`sshpass -e`，密码仅通过 `SSHPASS` 环境变量传递）。密码认证安全性弱于密钥认证，建议后续迁移到 SSH key；`SERVER_KNOWN_HOSTS` 必须配置，密码认证不等于服务器身份校验。
+> CD 使用 SSH 密码登录（`sshpass -e`，密码仅通过 `SSHPASS` 环境变量传递）。**当前阶段临时关闭了 host key 校验**（`StrictHostKeyChecking=no` + `UserKnownHostsFile=/dev/null`），不再需要配置 `SERVER_KNOWN_HOSTS` 或 `SERVER_SSH_KEY`，因此存在中间人攻击风险。这是首次部署的临时降级方案；部署稳定后应恢复 `StrictHostKeyChecking=yes`，并迁移到 SSH key + `known_hosts` 校验。
 
 ### Variables
 
