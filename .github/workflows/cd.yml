@@ -13,7 +13,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/tonynote
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/wecom-ai-customer-service
     steps:
       - uses: actions/checkout@v4
 
@@ -38,31 +38,39 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Configure SSH
+      # 服务器使用 SSH 密码登录：密码通过 SSHPASS 环境变量传给 sshpass -e，
+      # 不写入命令行参数，也不打印到日志。host key 仍然严格校验。
+      - name: Install sshpass
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sshpass
+
+      - name: Configure known hosts
         env:
-          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
           SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
           printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Upload compose manifest
         env:
+          SSHPASS: ${{ secrets.SERVER_PASSWORD }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '22' }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH'"
-          scp -o StrictHostKeyChecking=yes docker-compose.yml "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/docker-compose.yml"
+          sshpass -e ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH'"
+          sshpass -e scp -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -P "$SERVER_SSH_PORT" docker-compose.yml "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/docker-compose.yml"
 
       - name: Deploy over SSH
         env:
+          SSHPASS: ${{ secrets.SERVER_PASSWORD }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
+          SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '22' }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           IMAGE_REF: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
           APP_PORT: ${{ vars.APP_PORT || '8000' }}
@@ -93,7 +101,7 @@ jobs:
           RETRIEVAL_TOP_K: ${{ vars.RETRIEVAL_TOP_K || '5' }}
           REVISIT_AUTO_SEND_ENABLED: ${{ vars.REVISIT_AUTO_SEND_ENABLED || 'false' }}
         run: |
-          ssh -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" /bin/sh <<EOF
+          sshpass -e ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh <<EOF
           set -eu
           mkdir -p "$DEPLOY_PATH"
           cat > "$DEPLOY_PATH/.env" <<ENVFILE

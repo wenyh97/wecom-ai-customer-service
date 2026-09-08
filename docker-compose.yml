@@ -1,6 +1,6 @@
 services:
   app:
-    image: ${APP_IMAGE:-ghcr.io/wenyh97/tonynote:latest}
+    image: ${APP_IMAGE:-ghcr.io/wenyh97/wecom-ai-customer-service:latest}
     build:
       context: .
     env_file:
@@ -21,7 +21,7 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: ${APP_IMAGE:-ghcr.io/wenyh97/tonynote:latest}
+    image: ${APP_IMAGE:-ghcr.io/wenyh97/wecom-ai-customer-service:latest}
     build:
       context: .
     profiles: ["ops"]

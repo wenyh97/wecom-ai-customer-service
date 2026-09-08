@@ -64,15 +64,19 @@ curl -f http://127.0.0.1:8000/health
 
 | 名称 | 说明 |
 |---|---|
-| `SERVER_HOST` / `SERVER_USER` / `SERVER_SSH_KEY` / `SERVER_KNOWN_HOSTS` | SSH 部署 |
+| `SERVER_HOST` / `SERVER_USER` | 部署服务器地址与 SSH 用户（如 `TonyAdmin`） |
+| `SERVER_PASSWORD` | SSH 登录密码（配合 `sshpass` 使用） |
+| `SERVER_KNOWN_HOSTS` | 服务器 host key，`ssh-keyscan` 获取，用于严格 host key 校验 |
 | `DEPLOY_PATH` | 服务器部署目录 |
 | `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD` | MySQL 密码 |
 | `LLM_API_KEY` / `EMBEDDING_API_KEY` | 模型密钥 |
 | `WECOM_CORP_ID` / `WECOM_SECRET` / `WECOM_TOKEN` / `WECOM_AES_KEY` | 企业微信占位凭证 |
 
+> CD 使用 SSH 密码登录（`sshpass -e`，密码仅通过 `SSHPASS` 环境变量传递）。密码认证安全性弱于密钥认证，建议后续迁移到 SSH key；`SERVER_KNOWN_HOSTS` 必须配置，密码认证不等于服务器身份校验。
+
 ### Variables
 
-`APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_BASE_URL`、`LLM_MODEL`、`DEFAULT_TENANT_SLUG`、`DEFAULT_TENANT_NAME` 等。
+`SERVER_SSH_PORT`（默认 `22`）、`APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_BASE_URL`、`LLM_MODEL`、`DEFAULT_TENANT_SLUG`、`DEFAULT_TENANT_NAME` 等。
 
 ## 观察运行状态
 
