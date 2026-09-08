@@ -1,0 +1,141 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/tonynote
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Configure SSH
+        env:
+          SERVER_SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SERVER_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload compose manifest
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH'"
+          scp -o StrictHostKeyChecking=yes docker-compose.yml "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/docker-compose.yml"
+
+      - name: Deploy over SSH
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          IMAGE_REF: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          APP_PORT: ${{ vars.APP_PORT || '8000' }}
+          APP_ENV: production
+          APP_NAME: wecom-ai-assistant
+          APP_VERSION: ${{ github.sha }}
+          LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+          TZ: ${{ vars.TZ || 'Asia/Shanghai' }}
+          DEFAULT_TENANT_SLUG: ${{ vars.DEFAULT_TENANT_SLUG || 'default-tenant' }}
+          DEFAULT_TENANT_NAME: ${{ vars.DEFAULT_TENANT_NAME || '默认企业' }}
+          MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE || 'wecom_ai' }}
+          MYSQL_USER: ${{ vars.MYSQL_USER || 'wecom_ai' }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          REDIS_URL: redis://redis:6379/0
+          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.openai.com/v1' }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL || 'gpt-4o-mini' }}
+          EMBEDDING_BASE_URL: ${{ vars.EMBEDDING_BASE_URL || 'https://api.openai.com/v1' }}
+          EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
+          EMBEDDING_MODEL: ${{ vars.EMBEDDING_MODEL || 'text-embedding-3-small' }}
+          WECOM_CORP_ID: ${{ secrets.WECOM_CORP_ID }}
+          WECOM_SECRET: ${{ secrets.WECOM_SECRET }}
+          WECOM_TOKEN: ${{ secrets.WECOM_TOKEN }}
+          WECOM_AES_KEY: ${{ secrets.WECOM_AES_KEY }}
+          HANDOFF_CONFIDENCE_THRESHOLD: ${{ vars.HANDOFF_CONFIDENCE_THRESHOLD || '0.35' }}
+          SENSITIVE_KEYWORDS: ${{ vars.SENSITIVE_KEYWORDS || '退款纠纷,投诉,起诉,律师' }}
+          RETRIEVAL_TOP_K: ${{ vars.RETRIEVAL_TOP_K || '5' }}
+          REVISIT_AUTO_SEND_ENABLED: ${{ vars.REVISIT_AUTO_SEND_ENABLED || 'false' }}
+        run: |
+          ssh -o StrictHostKeyChecking=yes "$SERVER_USER@$SERVER_HOST" /bin/sh <<EOF
+          set -eu
+          mkdir -p "$DEPLOY_PATH"
+          cat > "$DEPLOY_PATH/.env" <<ENVFILE
+          APP_ENV=$APP_ENV
+          APP_NAME=$APP_NAME
+          APP_VERSION=$APP_VERSION
+          LOG_LEVEL=$LOG_LEVEL
+          APP_PORT=$APP_PORT
+          TZ=$TZ
+          DEFAULT_TENANT_SLUG=$DEFAULT_TENANT_SLUG
+          DEFAULT_TENANT_NAME=$DEFAULT_TENANT_NAME
+          APP_IMAGE=$IMAGE_REF
+          DATABASE_URL=mysql+asyncmy://$MYSQL_USER:$MYSQL_PASSWORD@mysql:3306/$MYSQL_DATABASE?charset=utf8mb4
+          REDIS_URL=$REDIS_URL
+          MYSQL_DATABASE=$MYSQL_DATABASE
+          MYSQL_USER=$MYSQL_USER
+          MYSQL_PASSWORD=$MYSQL_PASSWORD
+          MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+          LLM_BASE_URL=$LLM_BASE_URL
+          LLM_API_KEY=$LLM_API_KEY
+          LLM_MODEL=$LLM_MODEL
+          EMBEDDING_BASE_URL=$EMBEDDING_BASE_URL
+          EMBEDDING_API_KEY=$EMBEDDING_API_KEY
+          EMBEDDING_MODEL=$EMBEDDING_MODEL
+          WECOM_CORP_ID=$WECOM_CORP_ID
+          WECOM_SECRET=$WECOM_SECRET
+          WECOM_TOKEN=$WECOM_TOKEN
+          WECOM_AES_KEY=$WECOM_AES_KEY
+          HANDOFF_CONFIDENCE_THRESHOLD=$HANDOFF_CONFIDENCE_THRESHOLD
+          SENSITIVE_KEYWORDS=$SENSITIVE_KEYWORDS
+          RETRIEVAL_TOP_K=$RETRIEVAL_TOP_K
+          REVISIT_AUTO_SEND_ENABLED=$REVISIT_AUTO_SEND_ENABLED
+          ENVFILE
+          cd "$DEPLOY_PATH"
+          CURRENT_APP_ID=$(docker compose ps -q app || true)
+          if [ -n "$CURRENT_APP_ID" ]; then
+            docker inspect --format='{{.Config.Image}}' "$CURRENT_APP_ID" > .previous_app_image || true
+          fi
+          docker compose pull app migrate
+          docker compose --profile ops run --rm migrate
+          docker compose up -d app mysql redis
+          sleep 10
+          curl -fsS "http://127.0.0.1:$APP_PORT/health"
+          printf '%s\n' "$IMAGE_REF" > .current_app_image
+          EOF

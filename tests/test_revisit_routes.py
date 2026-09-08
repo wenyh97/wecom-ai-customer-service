@@ -33,6 +33,25 @@ def test_revisit_task_full_lifecycle(client: TestClient) -> None:
     assert send_resp.json()["status"] == "sent"
 
 
+def test_revisit_plan_create_and_list(client: TestClient) -> None:
+    create_resp = client.post(
+        "/revisit/plans",
+        json={
+            "customer_external_userid": "cust-plan-1",
+            "name": "节日问候计划",
+            "reason": "节日关怀",
+            "schedule_rule": "manual",
+        },
+    )
+    assert create_resp.status_code == 200
+    body = create_resp.json()
+    assert body["status"] == "active"
+
+    list_resp = client.get("/revisit/plans")
+    assert list_resp.status_code == 200
+    assert any(item["plan_id"] == body["plan_id"] for item in list_resp.json())
+
+
 def test_revisit_task_list_filters_by_status(client: TestClient) -> None:
     client.post(
         "/revisit/tasks",

@@ -9,3 +9,4 @@ def test_health_ok(client: TestClient) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert "version" in body
+    assert body["dependencies"]["database"] == "ok"

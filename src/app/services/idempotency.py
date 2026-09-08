@@ -1,27 +1,28 @@
-"""幂等键存储抽象与内存实现。
-
-生产环境应替换为 Redis（`SETNX` + TTL），第一阶段使用内存字典，
-接口保持一致以便替换。
-"""
+"""幂等键存储（数据库实现）。"""
 
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from app.db.repository import UnitOfWork
+
 
 @runtime_checkable
 class IdempotencyStore(Protocol):
-    async def get(self, key: str) -> dict | None: ...
+    async def get(self, uow: UnitOfWork, key: str) -> dict | None: ...
 
-    async def set(self, key: str, value: dict) -> None: ...
+    async def set(self, uow: UnitOfWork, key: str, value: dict) -> None: ...
 
 
-class InMemoryIdempotencyStore:
-    def __init__(self) -> None:
-        self._store: dict[str, dict] = {}
+class DatabaseIdempotencyStore:
+    def __init__(self, *, default_tenant_slug: str, default_tenant_name: str) -> None:
+        self._default_tenant_slug = default_tenant_slug
+        self._default_tenant_name = default_tenant_name
 
-    async def get(self, key: str) -> dict | None:
-        return self._store.get(key)
+    async def get(self, uow: UnitOfWork, key: str) -> dict | None:
+        record = await uow.idempotency.get(key)
+        return None if record is None else record.response_payload
 
-    async def set(self, key: str, value: dict) -> None:
-        self._store[key] = value
+    async def set(self, uow: UnitOfWork, key: str, value: dict) -> None:
+        tenant = await uow.tenants.get_or_create(self._default_tenant_slug, self._default_tenant_name)
+        await uow.idempotency.set(tenant_id=tenant.id, key=key, response_payload=value)
