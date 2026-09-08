@@ -1,323 +1,116 @@
-# TonyNote
+# 企业微信客户 AI 客服与回访助手
 
-Hermes Agent 远程 Linux 后端、Caddy HTTPS 反向代理与 Windows Desktop 客户端部署指南。
+企业微信员工已添加客户个人微信后，为客户咨询提供 AI 自动回复（RAG 知识库问答），
+并支持受控的人工/自动回访。本仓库当前处于 **第一阶段：需求、架构与可运行骨架**，
+严格按 [Spec Kit](https://github.com/github/spec-kit) 的规格驱动方式推进。
 
-> 推荐架构：Windows 只运行 Hermes Desktop；Linux 运行 Hermes Agent、模型配置、Skills、MCP、浏览器自动化和消息 Gateway。
+> 历史内容：本仓库此前包含一份 Hermes Agent 远程部署指南，与当前项目无关，
+> 已保留在 [`docs/legacy/hermes-remote-deployment.md`](docs/legacy/hermes-remote-deployment.md)，不再维护。
+
+## 明确不做（Non-goals）
+
+- **不接入微信个人号协议机器人**（不使用 Wechaty/Hook/协议号等灰色方案）。
+- **不使用 Dify** 或其他一体化 AI 平台。
+- 不做加好友、拉群等主动扩列（由人工完成）。
+- 第一阶段不做企业微信官方生产级联调，仅提供验签/解密/消息规范化的**接口与占位实现**。
+
+详见 [specs/spec.md](specs/spec.md) 的范围/非范围说明。
+
+## Spec Kit 工作方式
+
+本项目按照 Spec Kit 的文档层级推进，四个核心文档位于 `specs/` 目录：
+
+| 文档 | 作用 |
+|---|---|
+| [`specs/constitution.md`](specs/constitution.md) | 项目不可轻易违反的基本原则（做什么/不做什么的红线） |
+| [`specs/spec.md`](specs/spec.md) | 需求规格：角色、用例、范围/非范围、验收标准、风险与待确认项 |
+| [`specs/plan.md`](specs/plan.md) | 技术方案：选型对比、模块划分、演进路线 |
+| [`specs/tasks.md`](specs/tasks.md) | 可执行任务拆解与状态追踪 |
+
+**继续推进的建议流程**：
+
+1. 先修改/评审 `specs/constitution.md`（原则是否需要调整）；
+2. 再修改 `specs/spec.md`（需求/范围变化）；
+3. 再修改 `specs/plan.md`（技术方案变化，需说明选型对比与理由）；
+4. 最后拆解/更新 `specs/tasks.md`，逐项实现并勾选完成；
+5. 每次实现需同步更新 `docs/` 下的相关设计文档。
+
+补充设计文档（`docs/` 目录）：
+
+- [`docs/requirements.md`](docs/requirements.md) — 需求详情与可测试化验收标准
+- [`docs/architecture.md`](docs/architecture.md) — 架构、模块划分、关键设计决策
+- [`docs/api-contract.md`](docs/api-contract.md) — 接口草案（含待确认的企业微信官方限制标注）
+- [`docs/rag-agent.md`](docs/rag-agent.md) — RAG/Agent 核心链路
+- [`docs/observability-evaluation.md`](docs/observability-evaluation.md) — 日志/可观测性/评测方案
+- [`docs/deployment.md`](docs/deployment.md) — 部署说明
+- [`docs/acceptance.md`](docs/acceptance.md) — 验收清单与测试策略
+- [`docs/brainstorming.md`](docs/brainstorming.md) — 待决策清单
+
+## 技术栈（第一阶段）
+
+FastAPI + Pydantic + structlog；LLM/Embedding 通过 OpenAI-compatible 接口配置，
+默认使用内置的确定性假实现（`FakeLLMProvider` / `HashEmbeddingProvider`）以便
+无网络环境下开发测试。检索使用内存实现，PostgreSQL + pgvector / Redis 已在
+`docker-compose.yml` 中规划，真实落库留待下一阶段。完整选型对比见
+[specs/plan.md](specs/plan.md)。
+
+## 快速开始
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+cp .env.example .env
+
+uvicorn app.main:app --reload --app-dir src
+```
+
+验证：
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+打开 `http://127.0.0.1:8000/docs` 查看自动生成的 OpenAPI 文档。
+
+## 运行测试
+
+```bash
+pip install -e ".[dev]"
+pytest
+ruff check src tests
+```
+
+## Docker Compose
+
+```bash
+docker compose up --build
+```
+
+详见 [docs/deployment.md](docs/deployment.md)。
+
+## 项目结构
 
 ```text
-Windows Hermes Desktop
-        │ HTTPS + WebSocket
-        ▼
-https://hermes.example.com
-        │
-        ▼
-Caddy :443 ───────► Hermes serve 127.0.0.1:9119
+specs/                  # Spec Kit：constitution / spec / plan / tasks
+docs/                   # 详细设计文档
+docs/legacy/            # 历史遗留内容（与当前项目无关）
+src/app/
+├── main.py             # FastAPI 入口
+├── core/               # 配置、日志、错误处理、依赖容器
+├── wecom/              # 企业微信适配器（验签/解密/消息规范化占位）
+├── llm/                # LLM Provider 抽象
+├── rag/                # Embedding/Retriever 抽象与切分工具
+├── services/           # 会话、AI 编排、知识库、回访、人工接管、审计、评测
+├── schemas/            # Pydantic 请求/响应模型
+└── api/routes/         # health / wecom / chat / kb / revisit / handoff / eval
+tests/                  # pytest 单元与集成测试
+Dockerfile / docker-compose.yml / .env.example
 ```
 
-## 1. Linux 安装 Hermes
-
-SSH 登录服务器：
-
-```bash
-ssh <user>@<server>
-```
-
-安装并检查：
-
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh -o /tmp/install-hermes.sh
-less /tmp/install-hermes.sh
-bash /tmp/install-hermes.sh
-
-hermes --version
-hermes doctor
-```
-
-如果需要配置模型或账号，之后再执行：
-
-```bash
-hermes setup --portal
-# 或：hermes setup
-```
-
-## 2. 配置 Hermes 认证
-
-创建环境文件：
-
-```bash
-mkdir -p ~/.hermes
-nano ~/.hermes/.env
-```
-
-加入强密码和稳定的 Session Secret：
-
-```dotenv
-HERMES_DASHBOARD_BASIC_AUTH_USERNAME=admin
-HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=<strong-password>
-HERMES_DASHBOARD_BASIC_AUTH_SECRET=<random-secret>
-HERMES_DASHBOARD_PUBLIC_URL=https://hermes.example.com
-```
-
-生成随机 Secret：
-
-```bash
-openssl rand -base64 32
-```
-
-保护文件：
-
-```bash
-chmod 700 ~/.hermes
-chmod 600 ~/.hermes/.env
-```
-
-## 3. 先测试 Hermes 后端
-
-临时启动：
-
-```bash
-hermes serve --host 127.0.0.1 --port 9119
-```
-
-另开一个 SSH 窗口验证：
-
-```bash
-curl -i http://127.0.0.1:9119/api/status
-```
-
-确认监听地址：
-
-```bash
-ss -lntp | grep -E ':9119'
-```
-
-应为 `127.0.0.1:9119`。不要直接把 9119 暴露到公网。
-
-## 4. 配置 Caddy HTTPS 反向代理
-
-将域名 DNS 的 A 记录指向服务器公网 IP，例如：
-
-```text
-hermes.example.com  A  <server-public-ip>
-```
-
-开放云平台安全组和 Linux 防火墙的 80、443 端口：
-
-```bash
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
-sudo ufw delete allow 9119/tcp 2>/dev/null || true
-sudo ufw reload
-```
-
-安装 Caddy（Ubuntu/Debian）：
-
-```bash
-sudo apt update
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update
-sudo apt install -y caddy
-```
-
-编辑 `/etc/caddy/Caddyfile`：
-
-```caddyfile
-hermes.example.com {
-    reverse_proxy 127.0.0.1:9119
-}
-```
-
-域名与 `{` 之间必须有空格。检查并启动：
-
-```bash
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl enable --now caddy
-sudo systemctl reload caddy
-sudo systemctl status caddy
-```
-
-Caddy 会自动申请和续期 HTTPS 证书，并支持 WebSocket 转发。
-
-## 5. 验证公网访问
-
-Windows PowerShell：
-
-```powershell
-nslookup hermes.example.com
-curl.exe -i https://hermes.example.com/api/status
-curl.exe -i https://hermes.example.com/api/config
-curl.exe -i https://hermes.example.com/api/env
-```
-
-预期：
-
-- `/api/status` 返回 200 是正常的健康检查行为；
-- `/api/config` 和 `/api/env` 未登录时应返回 401；
-- 通过 `https://` 访问，不要使用 `:9119` 公网地址。
-
-服务器监听应类似：
-
-```text
-127.0.0.1:9119  hermes
-*:80             caddy
-*:443            caddy
-```
-
-## 6. 配置 Hermes systemd 服务
-
-停止临时前台进程（`Ctrl+C`），确认 Hermes 路径：
-
-```bash
-command -v hermes
-```
-
-创建用户服务：
-
-```bash
-mkdir -p ~/.config/systemd/user
-nano ~/.config/systemd/user/hermes-serve.service
-```
-
-内容如下，将路径替换为 `command -v hermes` 的实际结果：
-
-```ini
-[Unit]
-Description=Hermes Agent Remote Backend
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-ExecStart=%h/.local/bin/hermes serve --host 127.0.0.1 --port 9119
-WorkingDirectory=%h
-EnvironmentFile=%h/.hermes/.env
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=default.target
-```
-
-启用并查看日志：
-
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now hermes-serve
-systemctl --user status hermes-serve
-journalctl --user -u hermes-serve -f
-```
-
-让服务在 SSH 退出后继续运行：
-
-```bash
-sudo loginctl enable-linger "$USER"
-```
-
-## 7. 安装 Windows Desktop
-
-从官方页面下载**预编译** Windows Desktop：
-
-<https://hermes-agent.nousresearch.com/desktop>
-
-不要用以下命令现场构建：
-
-```bat
-hermes desktop
-```
-
-首次启动：
-
-1. 让安装器完成必要的 Desktop 引导安装；
-2. 进入 Hermes Desktop 后选择 **Connect to existing Hermes**；
-3. 不选择 **Install Hermes locally**；
-4. 进入 **Settings → Gateways → Remote gateway**；
-5. 填写：
-
-```text
-https://hermes.example.com
-```
-
-6. 使用 Linux `.env` 中的用户名和密码登录；
-7. 保存并测试聊天连接。
-
-某些 Windows 安装包会先执行一次本地 Desktop 引导安装，这是安装客户端运行环境的流程；远程连接选项通常在引导完成、Desktop 主界面启动后出现。
-
-## 8. 配置迁移（可选）
-
-建议先确认远程连接正常，再迁移配置。优先迁移：
-
-```text
-config.yaml
-.env
-skills/
-profiles/
-plugins/
-kanban.db
-```
-
-不要直接迁移：
-
-```text
-venv/
-node_modules/
-apps/desktop/
-Windows 缓存
-```
-
-Windows 路径（例如 `C:\Users\...`）不能原样用于 Linux。`.env` 含有密钥，不要提交 Git 或公开分享。
-
-示例：
-
-```powershell
-scp "$env:USERPROFILE\Desktop\hermes-backup\config.yaml" `
-  <user>@<server>:~/.hermes/config.yaml
-scp "$env:USERPROFILE\Desktop\hermes-backup\.env" `
-  <user>@<server>:~/.hermes/.env
-```
-
-Linux 上修正权限：
-
-```bash
-chmod 600 ~/.hermes/config.yaml ~/.hermes/.env
-```
-
-## 9. 安全检查清单
-
-- 公网只开放 80/443；不要开放 9119。
-- Hermes 只监听 `127.0.0.1:9119`，由 Caddy 代理。
-- 使用 HTTPS 和强 Basic Auth 密码；公网长期部署更推荐 OAuth。
-- Azure NSG 和 Linux 防火墙都检查一遍。
-- SSH 22 端口尽量限制为固定管理 IP，或通过 Tailscale 访问。
-- Caddy 配置变更后运行：
-
-```bash
-sudo caddy validate --config /etc/caddy/Caddyfile
-sudo systemctl reload caddy
-```
-
-- 服务异常时查看：
-
-```bash
-sudo journalctl -u caddy -n 100 --no-pager
-journalctl --user -u hermes-serve -n 100 --no-pager
-```
-
-## 10. 更新方式
-
-Linux 后端：
-
-```bash
-hermes update
-systemctl --user restart hermes-serve
-```
-
-Windows Desktop：使用 Desktop 内置的 **Update desktop app**，或从官方页面下载最新版预编译安装器覆盖安装。不要在 Windows 运行 `hermes update` 来维护远程 Linux 后端。
-
-## 参考
-
-- [Hermes Agent](https://github.com/NousResearch/hermes-agent)
-- [Hermes Desktop 远程后端文档](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/desktop.md)
-- [Caddy reverse_proxy](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy)
+## 已知限制
+
+见 [docs/acceptance.md](docs/acceptance.md) “已知限制”一节：当前所有数据存储为
+内存实现，企业微信验签/解密为占位实现，尚未接入真实 PostgreSQL/pgvector 和
+Celery/Arq 任务队列。这些均计划在后续按 `specs/tasks.md` 的“下阶段任务预告”推进。

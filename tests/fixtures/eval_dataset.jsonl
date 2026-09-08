@@ -1,0 +1,2 @@
+{"id": "case-001", "query": "退款多久到账？", "expected_doc_ids": ["doc-refund-policy"], "expected_handoff": false}
+{"id": "case-002", "query": "发货需要多久？", "expected_doc_ids": ["doc-shipping-policy"], "expected_handoff": false}
