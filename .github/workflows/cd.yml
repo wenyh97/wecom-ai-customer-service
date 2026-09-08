@@ -39,20 +39,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
 
       # 服务器使用 SSH 密码登录：密码通过 SSHPASS 环境变量传给 sshpass -e，
-      # 不写入命令行参数，也不打印到日志。host key 仍然严格校验。
+      # 不写入命令行参数，也不打印到日志。
+      # 临时方案：当前阶段关闭 host key 校验（StrictHostKeyChecking=no，
+      # UserKnownHostsFile=/dev/null），因此不再需要 SERVER_KNOWN_HOSTS。
+      # 这会带来中间人攻击风险，部署稳定后应恢复 StrictHostKeyChecking=yes
+      # 并改用 SSH key + known_hosts。
       - name: Install sshpass
         run: |
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq sshpass
-
-      - name: Configure known hosts
-        env:
-          SERVER_KNOWN_HOSTS: ${{ secrets.SERVER_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$SERVER_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
 
       - name: Upload compose manifest
         env:
@@ -62,8 +57,8 @@ jobs:
           SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '22' }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH'"
-          sshpass -e scp -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -P "$SERVER_SSH_PORT" docker-compose.yml "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/docker-compose.yml"
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH'"
+          sshpass -e scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -P "$SERVER_SSH_PORT" docker-compose.yml "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/docker-compose.yml"
 
       - name: Deploy over SSH
         env:
@@ -101,7 +96,7 @@ jobs:
           RETRIEVAL_TOP_K: ${{ vars.RETRIEVAL_TOP_K || '5' }}
           REVISIT_AUTO_SEND_ENABLED: ${{ vars.REVISIT_AUTO_SEND_ENABLED || 'false' }}
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=yes -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh <<EOF
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh <<EOF
           set -eu
           mkdir -p "$DEPLOY_PATH"
           cat > "$DEPLOY_PATH/.env" <<ENVFILE

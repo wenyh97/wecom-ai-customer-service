@@ -44,25 +44,25 @@ curl -f http://127.0.0.1:8000/health
 | `SERVER_HOST` | 部署服务器地址 |
 | `SERVER_USER` | SSH 用户，例如 `TonyAdmin` |
 | `SERVER_PASSWORD` | SSH 登录密码，CD 通过 `sshpass -e` 使用 |
-| `SERVER_KNOWN_HOSTS` | 服务器 host key，启用严格校验 |
-| `DEPLOY_PATH` | 服务器部署目录，例如 `/opt/wecom-ai-customer-service` |
+| `DEPLOY_PATH` | 服务器部署目录，统一为 `/opt/wecom-ai-customer-service` |
 | `MYSQL_PASSWORD` | MySQL 应用账号密码 |
 | `MYSQL_ROOT_PASSWORD` | MySQL root 密码 |
 | `LLM_API_KEY` | 真实模型密钥（可留空则使用 Fake） |
 | `EMBEDDING_API_KEY` | 真实 embedding 密钥（可留空） |
 | `WECOM_CORP_ID` / `WECOM_SECRET` / `WECOM_TOKEN` / `WECOM_AES_KEY` | 企业微信占位凭证 |
 
-### 4.2 获取 `SERVER_KNOWN_HOSTS`
+### 4.2 临时关闭 host key 校验（安全降级说明）
 
-在可信网络中执行，并核对指纹：
+当前阶段 CD 工作流临时关闭了 SSH host key 校验（`StrictHostKeyChecking=no` + `UserKnownHostsFile=/dev/null`），**不需要**配置 `SERVER_KNOWN_HOSTS` 或 `SERVER_SSH_KEY`。
 
-```bash
-ssh-keyscan -p 22 -t ed25519,rsa <SERVER_HOST>
-```
-
-将输出整体写入 `SERVER_KNOWN_HOSTS`。`SERVER_KNOWN_HOSTS` 是必需 Secret：密码认证只证明客户端身份，不校验服务器身份，关闭 host key 校验会带来中间人风险。
-
-> 安全提示：密码登录弱于密钥登录，密码可能被暴力破解且无法细粒度回收。当前按需求使用密码模式，建议后续迁移到 GitHub Actions 专用 SSH key。切勿把服务器密码写入仓库、文档或工作流日志。
+> 安全提示：关闭 host key 校验意味着无法确认对端服务器身份，存在中间人攻击风险。这是为完成首次部署而采用的临时方案。部署稳定后应尽快：
+>
+> 1. 恢复 `StrictHostKeyChecking=yes`；
+> 2. 通过可信网络执行 `ssh-keyscan` 或直接读取服务器 `/etc/ssh/ssh_host_*key.pub` 获取 host key，并核对指纹；
+> 3. 将 host key 重新配置为 Secret（或迁移到 known_hosts 文件管理），恢复严格校验；
+> 4. 评估迁移到 SSH key 登录，替代密码登录。
+>
+> 密码登录弱于密钥登录，密码可能被暴力破解且无法细粒度回收。当前按需求使用密码模式。切勿把服务器密码写入仓库、文档或工作流日志。
 
 ### 4.3 推荐 Variables
 
@@ -73,7 +73,7 @@ ssh-keyscan -p 22 -t ed25519,rsa <SERVER_HOST>
 CD 工作流执行顺序：
 
 1. 构建镜像并推送 GHCR；
-2. 安装 `sshpass`，使用 `SSHPASS` 环境变量 + 严格 host key 校验以密码方式连到服务器；
+2. 安装 `sshpass`，使用 `SSHPASS` 环境变量以密码方式连到服务器（当前阶段临时关闭 host key 校验，见 4.2）；
 3. 上传最新 `docker-compose.yml`；
 4. 生成/更新服务器 `.env`；
 5. `docker compose pull app migrate`；
