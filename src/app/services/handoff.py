@@ -1,9 +1,10 @@
-"""人工接管状态记录（内存实现）。"""
+"""人工接管状态记录（数据库实现）。"""
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
+
+from app.db.repository import UnitOfWork
 
 
 @dataclass
@@ -18,28 +19,28 @@ class HandoffRecord:
 
 
 class HandoffStore:
-    def __init__(self) -> None:
-        self._records: dict[str, HandoffRecord] = {}
-
-    def get(self, conversation_id: str) -> HandoffRecord:
-        return self._records.setdefault(
-            conversation_id, HandoffRecord(conversation_id=conversation_id)
+    async def get(self, uow: UnitOfWork, conversation_id: str) -> HandoffRecord:
+        record = await uow.handoffs.get_or_create(conversation_id)
+        return HandoffRecord(
+            conversation_id=record.conversation_id,
+            active=record.active,
+            operator=record.operator,
+            reason=record.reason,
+            started_at=None if record.started_at is None else record.started_at.timestamp(),
+            ended_at=None if record.ended_at is None else record.ended_at.timestamp(),
+            history=list(record.history_json),
         )
 
-    def takeover(self, conversation_id: str, operator: str, reason: str) -> HandoffRecord:
-        record = self.get(conversation_id)
-        record.active = True
-        record.operator = operator
-        record.reason = reason
-        record.started_at = time.time()
-        record.history.append(
-            {"action": "takeover", "operator": operator, "reason": reason}
-        )
-        return record
+    async def takeover(self, uow: UnitOfWork, conversation_id: str, operator: str, reason: str) -> HandoffRecord:
+        record = await uow.handoffs.takeover(conversation_id, operator=operator, reason=reason)
+        conversation = await uow.conversations.get_by_id(conversation_id)
+        if conversation is not None:
+            await uow.conversations.set_status(conversation, 'handoff')
+        return await self.get(uow, record.conversation_id)
 
-    def release(self, conversation_id: str) -> HandoffRecord:
-        record = self.get(conversation_id)
-        record.active = False
-        record.ended_at = time.time()
-        record.history.append({"action": "release", "operator": record.operator})
-        return record
+    async def release(self, uow: UnitOfWork, conversation_id: str) -> HandoffRecord:
+        record = await uow.handoffs.release(conversation_id)
+        conversation = await uow.conversations.get_by_id(conversation_id)
+        if conversation is not None:
+            await uow.conversations.set_status(conversation, 'ai_active')
+        return await self.get(uow, record.conversation_id)

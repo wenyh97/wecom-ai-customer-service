@@ -58,6 +58,9 @@ class InMemoryRetriever:
     embedding_provider: EmbeddingProvider
     _chunks: list[_IndexedChunk] = field(default_factory=list)
 
+    def clear(self) -> None:
+        self._chunks.clear()
+
     async def index_document(
         self, document_id: str, title: str, chunks: list[str]
     ) -> int:

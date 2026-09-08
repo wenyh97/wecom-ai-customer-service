@@ -2,7 +2,25 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class RevisitPlanCreateRequest(BaseModel):
+    customer_external_userid: str
+    name: str
+    reason: str
+    schedule_rule: str | None = None
+    metadata: dict = Field(default_factory=dict)
+
+
+class RevisitPlanResponse(BaseModel):
+    plan_id: str
+    customer_external_userid: str
+    name: str
+    reason: str
+    schedule_rule: str | None = None
+    status: str
+    metadata: dict = Field(default_factory=dict)
 
 
 class RevisitTaskCreateRequest(BaseModel):
@@ -24,4 +42,4 @@ class RevisitTaskResponse(BaseModel):
 class RevisitTaskReviewRequest(BaseModel):
     decision: str  # "approve" | "reject"
     reviewer: str
-    comment: str = ""
+    comment: str = ''

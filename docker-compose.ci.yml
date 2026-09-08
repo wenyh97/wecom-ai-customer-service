@@ -1,0 +1,17 @@
+services:
+  app:
+    environment:
+      APP_ENV: test
+      DATABASE_URL: mysql+asyncmy://wecom_ai:CHANGE_ME_PASSWORD@mysql:3306/wecom_ai?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+  migrate:
+    environment:
+      APP_ENV: test
+      DATABASE_URL: mysql+asyncmy://wecom_ai:CHANGE_ME_PASSWORD@mysql:3306/wecom_ai?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0
+  mysql:
+    environment:
+      MYSQL_DATABASE: wecom_ai
+      MYSQL_USER: wecom_ai
+      MYSQL_PASSWORD: wecom_ai
+      MYSQL_ROOT_PASSWORD: rootpass
