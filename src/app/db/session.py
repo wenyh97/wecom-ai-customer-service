@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from sqlalchemy import text
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -42,13 +42,13 @@ async def ping_database(session_factory: async_sessionmaker[AsyncSession]) -> bo
         return False
 
 
-def make_sync_database_url(database_url: str) -> str:
+def make_sync_database_url(database_url: str | URL) -> URL:
     url = make_url(database_url)
     if url.drivername == 'mysql+asyncmy':
-        return str(url.set(drivername='mysql+pymysql'))
+        return url.set(drivername='mysql+pymysql')
     if url.drivername == 'sqlite+aiosqlite':
-        return str(url.set(drivername='sqlite'))
-    return database_url
+        return url.set(drivername='sqlite')
+    return url
 
 
 async def session_scope(session_factory: async_sessionmaker[AsyncSession]) -> AsyncIterator[AsyncSession]:
