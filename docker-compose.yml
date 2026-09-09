@@ -7,7 +7,6 @@ services:
       - .env
     environment:
       APP_ENV: ${APP_ENV:-production}
-      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-wecom_ai}:${MYSQL_PASSWORD:-CHANGE_ME_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-wecom_ai}?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0
       TZ: ${TZ:-Asia/Shanghai}
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "src"]
@@ -29,7 +28,6 @@ services:
       - .env
     environment:
       APP_ENV: ${APP_ENV:-production}
-      DATABASE_URL: mysql+asyncmy://${MYSQL_USER:-wecom_ai}:${MYSQL_PASSWORD:-CHANGE_ME_PASSWORD}@mysql:3306/${MYSQL_DATABASE:-wecom_ai}?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0
       TZ: ${TZ:-Asia/Shanghai}
     command: ["alembic", "upgrade", "head"]
