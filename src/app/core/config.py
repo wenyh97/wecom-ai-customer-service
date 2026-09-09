@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     llm_api_key: str = Field(default='', alias='LLM_API_KEY')
     llm_model: str = Field(default='gpt-4o-mini', alias='LLM_MODEL')
     llm_timeout_seconds: float = Field(default=15.0, alias='LLM_TIMEOUT_SECONDS')
+    ai_bridge_token: str = Field(default='', alias='AI_BRIDGE_TOKEN')
 
     embedding_base_url: str = Field(
         default='https://api.openai.com/v1', alias='EMBEDDING_BASE_URL'
@@ -73,6 +74,7 @@ class Settings(BaseSettings):
         default='退款纠纷,投诉,起诉,律师', alias='SENSITIVE_KEYWORDS'
     )
     retrieval_top_k: int = Field(default=5, alias='RETRIEVAL_TOP_K')
+    bridge_chat_history_limit: int = Field(default=12, alias='BRIDGE_CHAT_HISTORY_LIMIT')
 
     revisit_auto_send_enabled: bool = Field(
         default=False, alias='REVISIT_AUTO_SEND_ENABLED'

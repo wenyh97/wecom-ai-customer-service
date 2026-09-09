@@ -64,5 +64,31 @@ services:
     # Redis 在 Phase 1 生产 compose 中预留，但当前应用代码尚未消费，后续用于缓存/TTL/队列。
     restart: unless-stopped
 
+  wechaty-bridge:
+    profiles: ["workpro"]
+    build:
+      context: ./bridge
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      TZ: ${TZ:-Asia/Shanghai}
+      WECHATY_PUPPET_SERVICE_TOKEN: ${WECHATY_PUPPET_SERVICE_TOKEN:-}
+      WECHATY_PUPPET_SERVICE_AUTHORITY: ${WECHATY_PUPPET_SERVICE_AUTHORITY:-token-service-discovery-test.juzibot.com}
+      AI_API_BASE_URL: ${AI_API_BASE_URL:-http://app:8000}
+      AI_BRIDGE_TOKEN: ${AI_BRIDGE_TOKEN:-}
+      BRIDGE_MESSAGE_TIMEOUT_MS: ${BRIDGE_MESSAGE_TIMEOUT_MS:-20000}
+      BRIDGE_API_MAX_RETRIES: ${BRIDGE_API_MAX_RETRIES:-1}
+      BRIDGE_REPLY_MAX_LENGTH: ${BRIDGE_REPLY_MAX_LENGTH:-500}
+      BRIDGE_MAX_MESSAGE_AGE_SECONDS: ${BRIDGE_MAX_MESSAGE_AGE_SECONDS:-180}
+      BRIDGE_CONTACT_WHITELIST: ${BRIDGE_CONTACT_WHITELIST:-}
+      WORKPRO_AUTO_ACCEPT_FRIENDSHIP: ${WORKPRO_AUTO_ACCEPT_FRIENDSHIP:-false}
+      WORKPRO_STAFF_USERID: ${WORKPRO_STAFF_USERID:-}
+    command: ["npm", "run", "start"]
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   mysql_data:

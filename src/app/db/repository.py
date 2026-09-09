@@ -106,7 +106,13 @@ class ConversationRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def get_or_create(self, tenant_id: str, customer_id: str, staff_user_id: str) -> Conversation:
+    async def get_or_create(
+        self,
+        tenant_id: str,
+        customer_id: str,
+        staff_user_id: str,
+        channel: str = 'wecom',
+    ) -> Conversation:
         conversation = await self.session.scalar(
             select(Conversation).where(
                 Conversation.customer_id == customer_id,
@@ -119,6 +125,7 @@ class ConversationRepository:
             tenant_id=tenant_id,
             customer_id=customer_id,
             staff_user_id=staff_user_id,
+            channel=channel,
             last_message_at=utcnow(),
         )
         self.session.add(conversation)

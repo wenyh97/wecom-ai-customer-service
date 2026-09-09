@@ -25,3 +25,9 @@ dist/
 
 # Docker
 *.log
+
+# Node / TypeScript
+node_modules/
+**/node_modules/
+bridge/node_modules/
+bridge/dist/
