@@ -1,0 +1,16 @@
+{
+  "name": "workpro-wechaty-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test",
+    "lint": "node --check src/*.js tests/*.js",
+    "typecheck": "node --check src/*.js tests/*.js"
+  },
+  "dependencies": {
+    "@juzi/wechaty": "^1.20.2",
+    "@juzi/wechaty-puppet-service": "^1.20.2"
+  }
+}

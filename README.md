@@ -16,6 +16,7 @@
 - 会话、消息、幂等、人工接管、回访计划/任务、审计日志持久化
 - Fake LLM / OpenAI-compatible LLM
 - 企业微信“微信客服”回调验签、AES 解密、`sync_msg` 拉取、`kf/send_msg` 文本回复
+- WorkPro/Wechaty Bridge（JuziBot 试用接入）：企业微信账号扫码登录后，一对一文本消息转发到 FastAPI `/chat/messages`
 - Docker Compose（app + mysql + redis + migrate）
 - GitHub Actions CI / CD 工作流
 
@@ -87,6 +88,53 @@ curl -f http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/health
 docker compose logs -f app
 docker compose logs -f mysql
+```
+
+## WorkPro / Wechaty Bridge（JuziBot 试用）
+
+### 1. 依赖与环境变量
+
+- Node 包必须使用：
+  - `@juzi/wechaty`
+  - `@juzi/wechaty-puppet-service`
+- 必填环境变量：
+  - `WECHATY_PUPPET_SERVICE_TOKEN`（试用 token）
+  - `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`
+  - `WORKPRO_STAFF_USERID`（员工 ID，用于 FastAPI 会话主键）
+- 默认安全开关：`WORKPRO_AUTO_ACCEPT_FRIENDSHIP=false`（默认不自动通过好友申请）。
+- 试用环境建议固定使用上面的 `WECHATY_PUPPET_SERVICE_AUTHORITY`（社区常见 `api.chatie.io` 在试用阶段可能服务发现失败）。
+- 试用 token 同时仅允许登录一个企业微信账号；退出后可切换账号，不做永久绑定。
+- 试用/收费策略以服务商最新说明为准，仅作为运维提示，不在业务逻辑里硬编码。
+
+### 2. 本地启动（试用环境）
+
+```bash
+cd workpro-bridge
+npm install
+npm run start
+```
+
+或使用 Compose profile：
+
+```bash
+cp .env.example .env
+docker compose --profile workpro up -d app mysql redis workpro-bridge
+docker compose --profile workpro logs -f workpro-bridge
+```
+
+### 3. 扫码与演示流程
+
+1. 启动后查看日志中的二维码内容（`scan` 事件）。
+2. 使用企业微信员工账号扫码并确认登录。
+3. 让测试客户手工添加员工并由员工端确认好友关系（默认不自动通过好友申请）。
+4. 客户发送一对一文本消息，Bridge 只处理 `message.room() == null` 且 `message.type() === types.Message.Text` 的消息。
+5. Bridge 使用 `message.talker().id` + `message.id` 调用 FastAPI `/chat/messages`，并将回复回写到同一会话。
+
+### 4. 风控与合规提示
+
+- `WORKPRO_AUTO_ACCEPT_FRIENDSHIP=true` 仅用于受控测试，存在账号风控和合规风险。
+- `room-join` 仅做脱敏审计日志，不做群欢迎或群自动回复；群消息会被忽略。
+- 不要在仓库或日志中写入真实 token、客户数据或其他敏感信息。
 
 ## 微信客服 Demo 配置与验证
 

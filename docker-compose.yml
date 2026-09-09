@@ -64,5 +64,26 @@ services:
     # Redis 在 Phase 1 生产 compose 中预留，但当前应用代码尚未消费，后续用于缓存/TTL/队列。
     restart: unless-stopped
 
+  workpro-bridge:
+    image: node:20-alpine
+    profiles: ["workpro"]
+    working_dir: /workspace/workpro-bridge
+    env_file:
+      - .env
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      WECHATY_PUPPET_SERVICE_AUTHORITY: ${WECHATY_PUPPET_SERVICE_AUTHORITY:-token-service-discovery-test.juzibot.com}
+      WORKPRO_AUTO_ACCEPT_FRIENDSHIP: ${WORKPRO_AUTO_ACCEPT_FRIENDSHIP:-false}
+      WORKPRO_BRIDGE_API_BASE_URL: ${WORKPRO_BRIDGE_API_BASE_URL:-http://app:8000}
+      WORKPRO_BRIDGE_API_ENDPOINT: ${WORKPRO_BRIDGE_API_ENDPOINT:-/chat/messages}
+      WORKPRO_BRIDGE_HTTP_TIMEOUT_MS: ${WORKPRO_BRIDGE_HTTP_TIMEOUT_MS:-10000}
+    command: sh -c "npm install --no-fund --no-audit && npm run start"
+    volumes:
+      - ./:/workspace
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   mysql_data:
