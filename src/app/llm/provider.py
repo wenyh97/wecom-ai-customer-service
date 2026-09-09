@@ -8,9 +8,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from typing import Literal, Protocol, runtime_checkable
 
 import httpx
+
+LLMAuthMode = Literal['bearer', 'api-key']
 
 
 @dataclass(frozen=True)
@@ -78,10 +80,17 @@ class OpenAICompatibleLLMProvider:
     可用于 OpenAI 官方、DeepSeek、通义千问兼容模式、自托管 vLLM/Ollama 网关等。
     """
 
-    def __init__(self, base_url: str, api_key: str, model: str) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        model: str,
+        auth_mode: LLMAuthMode = 'bearer',
+    ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._model = model
+        self._auth_mode = auth_mode
 
     async def generate(
         self,
@@ -95,7 +104,11 @@ class OpenAICompatibleLLMProvider:
             "temperature": temperature,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
-        headers = {"Authorization": "Bearer " + self._api_key}
+        headers = (
+            {'api-key': self._api_key}
+            if self._auth_mode == 'api-key'
+            else {'Authorization': 'Bearer ' + self._api_key}
+        )
         try:
             async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(
@@ -107,7 +120,7 @@ class OpenAICompatibleLLMProvider:
         except httpx.TimeoutException as exc:
             raise LLMTimeoutError("llm call timed out") from exc
         except httpx.HTTPError as exc:
-            raise LLMCallError(f"llm call failed: {exc}") from exc
+            raise LLMCallError('llm call failed') from exc
 
         data = response.json()
         choice = data["choices"][0]["message"]["content"]

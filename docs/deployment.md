@@ -24,7 +24,7 @@
 ## 3. 首次部署
 
 1. 复制 `.env.example` 为服务器上的 `.env`，填入真实值；
-2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`WECOM_*`；
+2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`LLM_AUTH_MODE`（默认 `bearer`，Azure OpenAI 用 `api-key`）、`WECOM_*`；
 3. 如需启动 WorkPro Bridge，再补齐：`WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`、`AI_BRIDGE_TOKEN`，必要时补 `WORKPRO_STAFF_USERID`；
 4. 执行：
 
@@ -43,6 +43,14 @@ docker compose --profile workpro logs -f wechaty-bridge
 ```
 
 > JuziBot 试用环境建议保留 `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`；试用 token 同时只允许登录一个企业微信账号，退出后可切换账号。默认不要关闭 TLS。收费与配额以服务商公告为准，不在应用代码中硬编码。
+
+Azure OpenAI 示例（保持 `/openai/v1/chat/completions` 路径）：
+
+```dotenv
+LLM_BASE_URL=https://你的资源名.openai.azure.com/openai/v1/
+LLM_MODEL=gpt-5.6-luna
+LLM_AUTH_MODE=api-key
+```
 
 > 应用不会在启动时自动建表；必须先执行 `alembic upgrade head`（通过 `migrate` 服务完成）。
 
