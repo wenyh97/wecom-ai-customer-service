@@ -42,6 +42,8 @@ docker compose --profile workpro up -d wechaty-bridge
 docker compose --profile workpro logs -f wechaty-bridge
 ```
 
+> Bridge 运行时仅支持 Node `20.x/22.x` LTS；仓库中 `bridge/Dockerfile` 固定 `node:22-bookworm-slim`，依赖必须通过 `bridge/package-lock.json` + `npm ci` 安装，避免在线解析到不兼容的 gRPC resolver 版本。
+
 > JuziBot 试用环境建议保留 `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`；试用 token 同时只允许登录一个企业微信账号，退出后可切换账号。默认不要关闭 TLS。收费与配额以服务商公告为准，不在应用代码中硬编码。
 
 Azure OpenAI 示例（保持 `/openai/v1/chat/completions` 路径）：
@@ -106,6 +108,18 @@ CD 工作流执行顺序：
 9. `curl /health` 校验。
 
 若迁移失败，发布应停止，不应继续重启应用容器。
+
+若本次发布包含 `bridge/` 变更，服务器需先同步最新 `main` 的 `bridge/` 目录，然后执行：
+
+```bash
+cd /opt/wecom-ai-customer-service
+docker compose --profile workpro stop wechaty-bridge || true
+docker compose --profile workpro rm -f wechaty-bridge || true
+docker compose --profile workpro build --no-cache --pull wechaty-bridge
+docker compose --profile workpro up wechaty-bridge
+```
+
+预期 Bridge 不再出现 `ERR_INVALID_ARG_TYPE` resolver callback 异常，并继续进入扫码/二维码登录流程。
 
 ## 6. 日志与健康检查
 
