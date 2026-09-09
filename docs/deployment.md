@@ -23,7 +23,7 @@
 ## 3. 首次部署
 
 1. 复制 `.env.example` 为服务器上的 `.env`，填入真实值；
-2. 至少配置：`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`LLM_API_KEY`（如需要真实模型）、`WECOM_*`；
+2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`WECOM_*`；
 3. 执行：
 
 ```bash
@@ -45,11 +45,11 @@ curl -f http://127.0.0.1:8000/health
 | `SERVER_USER` | SSH 用户，例如 `TonyAdmin` |
 | `SERVER_PASSWORD` | SSH 登录密码，CD 通过 `sshpass -e` 使用 |
 | `DEPLOY_PATH` | 服务器部署目录，统一为 `/opt/wecom-ai-customer-service` |
-| `MYSQL_PASSWORD` | MySQL 应用账号密码 |
-| `MYSQL_ROOT_PASSWORD` | MySQL root 密码 |
 | `LLM_API_KEY` | 真实模型密钥（可留空则使用 Fake） |
 | `EMBEDDING_API_KEY` | 真实 embedding 密钥（可留空） |
 | `WECOM_CORP_ID` / `WECOM_SECRET` / `WECOM_TOKEN` / `WECOM_AES_KEY` | 企业微信占位凭证 |
+
+> 生产 MySQL 凭证改由服务器 `$DEPLOY_PATH/.env` 管理。GitHub Actions CD **不会**再覆盖 `MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`MYSQL_DATABASE`、`MYSQL_USER` 或整份 `.env`。
 
 ### 4.2 临时关闭 host key 校验（安全降级说明）
 
@@ -66,7 +66,9 @@ curl -f http://127.0.0.1:8000/health
 
 ### 4.3 推荐 Variables
 
-`SERVER_SSH_PORT`（默认 `22`）、`APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_BASE_URL`、`LLM_MODEL`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`DEFAULT_TENANT_*`。
+`SERVER_SSH_PORT`（默认 `22`）。
+
+应用配置（如 `APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_*`、`EMBEDDING_*`、`DEFAULT_TENANT_*`）请直接维护在服务器 `.env`。
 
 ## 5. 更新发布
 
@@ -75,11 +77,12 @@ CD 工作流执行顺序：
 1. 构建镜像并推送 GHCR；
 2. 安装 `sshpass`，使用 `SSHPASS` 环境变量以密码方式连到服务器（当前阶段临时关闭 host key 校验，见 4.2）；
 3. 上传最新 `docker-compose.yml`；
-4. 生成/更新服务器 `.env`；
-5. `docker compose pull app migrate`；
-6. `docker compose --profile ops run --rm migrate`；
-7. `docker compose up -d app mysql redis`；
-8. `curl /health` 校验。
+4. 在服务器检查 `$DEPLOY_PATH/.env` 已存在，且至少包含 `MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`；
+5. 仅更新 `.env` 中的 `APP_IMAGE` 为本次构建镜像（若不存在则追加该项），不改写其他配置；
+6. `docker compose pull app migrate`；
+7. `docker compose --profile ops run --rm migrate`；
+8. `docker compose up -d app mysql redis`；
+9. `curl /health` 校验。
 
 若迁移失败，发布应停止，不应继续重启应用容器。
 

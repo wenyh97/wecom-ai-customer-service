@@ -68,69 +68,36 @@ jobs:
           SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '22' }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           IMAGE_REF: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-          APP_PORT: ${{ vars.APP_PORT || '8000' }}
-          APP_ENV: production
-          APP_NAME: wecom-ai-assistant
-          APP_VERSION: ${{ github.sha }}
-          LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
-          TZ: ${{ vars.TZ || 'Asia/Shanghai' }}
-          DEFAULT_TENANT_SLUG: ${{ vars.DEFAULT_TENANT_SLUG || 'default-tenant' }}
-          DEFAULT_TENANT_NAME: ${{ vars.DEFAULT_TENANT_NAME || '默认企业' }}
-          MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE || 'wecom_ai' }}
-          MYSQL_USER: ${{ vars.MYSQL_USER || 'wecom_ai' }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          REDIS_URL: redis://redis:6379/0
-          LLM_BASE_URL: ${{ vars.LLM_BASE_URL || 'https://api.openai.com/v1' }}
-          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-          LLM_MODEL: ${{ vars.LLM_MODEL || 'gpt-4o-mini' }}
-          EMBEDDING_BASE_URL: ${{ vars.EMBEDDING_BASE_URL || 'https://api.openai.com/v1' }}
-          EMBEDDING_API_KEY: ${{ secrets.EMBEDDING_API_KEY }}
-          EMBEDDING_MODEL: ${{ vars.EMBEDDING_MODEL || 'text-embedding-3-small' }}
-          WECOM_CORP_ID: ${{ secrets.WECOM_CORP_ID }}
-          WECOM_SECRET: ${{ secrets.WECOM_SECRET }}
-          WECOM_TOKEN: ${{ secrets.WECOM_TOKEN }}
-          WECOM_AES_KEY: ${{ secrets.WECOM_AES_KEY }}
-          HANDOFF_CONFIDENCE_THRESHOLD: ${{ vars.HANDOFF_CONFIDENCE_THRESHOLD || '0.35' }}
-          SENSITIVE_KEYWORDS: ${{ vars.SENSITIVE_KEYWORDS || '退款纠纷,投诉,起诉,律师' }}
-          RETRIEVAL_TOP_K: ${{ vars.RETRIEVAL_TOP_K || '5' }}
-          REVISIT_AUTO_SEND_ENABLED: ${{ vars.REVISIT_AUTO_SEND_ENABLED || 'false' }}
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh <<EOF
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh -s -- "$DEPLOY_PATH" "$IMAGE_REF" <<'EOF'
           set -eu
+          DEPLOY_PATH=$1
+          IMAGE_REF=$2
           mkdir -p "$DEPLOY_PATH"
-          cat > "$DEPLOY_PATH/.env" <<ENVFILE
-          APP_ENV=$APP_ENV
-          APP_NAME=$APP_NAME
-          APP_VERSION=$APP_VERSION
-          LOG_LEVEL=$LOG_LEVEL
-          APP_PORT=$APP_PORT
-          TZ=$TZ
-          DEFAULT_TENANT_SLUG=$DEFAULT_TENANT_SLUG
-          DEFAULT_TENANT_NAME=$DEFAULT_TENANT_NAME
-          APP_IMAGE=$IMAGE_REF
-          DATABASE_URL=mysql+asyncmy://$MYSQL_USER:$MYSQL_PASSWORD@mysql:3306/$MYSQL_DATABASE?charset=utf8mb4
-          REDIS_URL=$REDIS_URL
-          MYSQL_DATABASE=$MYSQL_DATABASE
-          MYSQL_USER=$MYSQL_USER
-          MYSQL_PASSWORD=$MYSQL_PASSWORD
-          MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
-          LLM_BASE_URL=$LLM_BASE_URL
-          LLM_API_KEY=$LLM_API_KEY
-          LLM_MODEL=$LLM_MODEL
-          EMBEDDING_BASE_URL=$EMBEDDING_BASE_URL
-          EMBEDDING_API_KEY=$EMBEDDING_API_KEY
-          EMBEDDING_MODEL=$EMBEDDING_MODEL
-          WECOM_CORP_ID=$WECOM_CORP_ID
-          WECOM_SECRET=$WECOM_SECRET
-          WECOM_TOKEN=$WECOM_TOKEN
-          WECOM_AES_KEY=$WECOM_AES_KEY
-          HANDOFF_CONFIDENCE_THRESHOLD=$HANDOFF_CONFIDENCE_THRESHOLD
-          SENSITIVE_KEYWORDS=$SENSITIVE_KEYWORDS
-          RETRIEVAL_TOP_K=$RETRIEVAL_TOP_K
-          REVISIT_AUTO_SEND_ENABLED=$REVISIT_AUTO_SEND_ENABLED
-          ENVFILE
           cd "$DEPLOY_PATH"
+          if [ ! -f .env ]; then
+            echo "Missing required $DEPLOY_PATH/.env" >&2
+            exit 1
+          fi
+          for required_var in MYSQL_USER MYSQL_PASSWORD MYSQL_ROOT_PASSWORD DATABASE_URL; do
+            if ! grep -q "^${required_var}=" .env; then
+              echo "Missing required ${required_var} entry in $DEPLOY_PATH/.env" >&2
+              exit 1
+            fi
+          done
+          tmp_env=$(mktemp .env.XXXXXX)
+          trap 'rm -f "$tmp_env"' EXIT
+          awk -v image="$IMAGE_REF" '
+            BEGIN { updated = 0 }
+            /^APP_IMAGE=/ { print "APP_IMAGE=" image; updated = 1; next }
+            { print }
+            END {
+              if (!updated) {
+                print "APP_IMAGE=" image
+              }
+            }
+          ' .env > "$tmp_env"
+          mv "$tmp_env" .env
           CURRENT_APP_ID=$(docker compose ps -q app || true)
           if [ -n "$CURRENT_APP_ID" ]; then
             docker inspect --format='{{.Config.Image}}' "$CURRENT_APP_ID" > .previous_app_image || true
@@ -138,7 +105,8 @@ jobs:
           docker compose pull app migrate
           docker compose --profile ops run --rm migrate
           docker compose up -d app mysql redis
+          APP_PORT_VALUE=$(awk -F= '/^APP_PORT=/{print substr($0, index($0, "=") + 1); found=1; exit} END { if (!found) print "8000" }' .env)
           sleep 10
-          curl -fsS "http://127.0.0.1:$APP_PORT/health"
+          curl -fsS "http://127.0.0.1:$APP_PORT_VALUE/health"
           printf '%s\n' "$IMAGE_REF" > .current_app_image
           EOF

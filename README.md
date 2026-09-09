@@ -67,15 +67,18 @@ curl -f http://127.0.0.1:8000/health
 | `SERVER_HOST` / `SERVER_USER` | 部署服务器地址与 SSH 用户（如 `TonyAdmin`） |
 | `SERVER_PASSWORD` | SSH 登录密码（配合 `sshpass` 使用） |
 | `DEPLOY_PATH` | 服务器部署目录（统一为 `/opt/wecom-ai-customer-service`） |
-| `MYSQL_PASSWORD` / `MYSQL_ROOT_PASSWORD` | MySQL 密码 |
 | `LLM_API_KEY` / `EMBEDDING_API_KEY` | 模型密钥 |
 | `WECOM_CORP_ID` / `WECOM_SECRET` / `WECOM_TOKEN` / `WECOM_AES_KEY` | 企业微信占位凭证 |
 
+> 生产环境的 `MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`MYSQL_DATABASE`、`DATABASE_URL` 统一由服务器 `/opt/wecom-ai-customer-service/.env` 管理；GitHub Actions CD 只会校验这些条目存在，并把 `APP_IMAGE` 更新为本次构建镜像，不会再覆盖整份 `.env`。
+>
 > CD 使用 SSH 密码登录（`sshpass -e`，密码仅通过 `SSHPASS` 环境变量传递）。**当前阶段临时关闭了 host key 校验**（`StrictHostKeyChecking=no` + `UserKnownHostsFile=/dev/null`），不再需要配置 `SERVER_KNOWN_HOSTS` 或 `SERVER_SSH_KEY`，因此存在中间人攻击风险。这是首次部署的临时降级方案；部署稳定后应恢复 `StrictHostKeyChecking=yes`，并迁移到 SSH key + `known_hosts` 校验。
 
 ### Variables
 
-`SERVER_SSH_PORT`（默认 `22`）、`APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`LLM_BASE_URL`、`LLM_MODEL`、`DEFAULT_TENANT_SLUG`、`DEFAULT_TENANT_NAME` 等。
+`SERVER_SSH_PORT`（默认 `22`）。
+
+应用配置（如 `APP_PORT`、`LOG_LEVEL`、`TZ`、`MYSQL_DATABASE`、`MYSQL_USER`、`DATABASE_URL`、`LLM_*`、`EMBEDDING_*`、`DEFAULT_TENANT_*`）请直接维护在服务器 `/opt/wecom-ai-customer-service/.env`。
 
 ## 观察运行状态
 
