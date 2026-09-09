@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default='https://api.openai.com/v1', alias='LLM_BASE_URL')
     llm_api_key: str = Field(default='', alias='LLM_API_KEY')
     llm_model: str = Field(default='gpt-4o-mini', alias='LLM_MODEL')
+    llm_auth_mode: Literal['bearer', 'api-key'] = Field(
+        default='bearer', alias='LLM_AUTH_MODE'
+    )
     llm_timeout_seconds: float = Field(default=15.0, alias='LLM_TIMEOUT_SECONDS')
     ai_bridge_token: str = Field(default='', alias='AI_BRIDGE_TOKEN')
 

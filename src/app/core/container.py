@@ -71,6 +71,7 @@ def build_llm_provider(settings: Settings) -> LLMProvider:
         base_url=settings.llm_base_url,
         api_key=settings.llm_api_key,
         model=settings.llm_model,
+        auth_mode=settings.llm_auth_mode,
     )
 
 

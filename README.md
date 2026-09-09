@@ -76,12 +76,22 @@ python scripts/smoke_test.py
 LLM_API_KEY=你的真实模型密钥
 LLM_BASE_URL=https://你的-openai-compatible-provider/v1
 LLM_MODEL=gpt-4o-mini
+LLM_AUTH_MODE=bearer
 LLM_TIMEOUT_SECONDS=15
 AI_BRIDGE_TOKEN=仅供 bridge 使用的共享密钥
 ```
 
 - 若未配置 `LLM_API_KEY`，`POST /internal/chat` 会明确返回诊断错误。
+- `LLM_AUTH_MODE` 默认 `bearer`（发送 `Authorization` 头）；Azure OpenAI 需改为 `api-key`（发送 `api-key` 头）。
 - `AI_BRIDGE_TOKEN` 必须同时配置在 FastAPI 和 Bridge 侧，但绝不能提交仓库。
+
+Azure OpenAI 示例：
+
+```dotenv
+LLM_BASE_URL=https://你的资源名.openai.azure.com/openai/v1/
+LLM_MODEL=gpt-5.6-luna
+LLM_AUTH_MODE=api-key
+```
 
 ### Bridge `.env` 关键项
 
