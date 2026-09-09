@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import chat, handoff, health, kb, revisit, wecom
+from app.api.routes import chat, handoff, health, internal, kb, revisit, wecom
 from app.api.routes import eval as eval_routes
 from app.core.config import Settings, get_settings
 from app.core.container import Container, build_container
@@ -44,6 +44,7 @@ def create_app(settings: Settings | None = None, container: Container | None = N
 
     app.include_router(health.router)
     app.include_router(wecom.router)
+    app.include_router(internal.router)
     app.include_router(chat.router)
     app.include_router(kb.router)
     app.include_router(revisit.router)

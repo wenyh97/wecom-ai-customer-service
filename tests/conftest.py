@@ -25,6 +25,7 @@ def settings() -> Settings:
         app_env='test',
         database_url='sqlite+aiosqlite:///:memory:',
         llm_api_key='',
+        ai_bridge_token='bridge-test-token',
         embedding_api_key='',
         wecom_token='test-token',
         wecom_kf_secret='test-kf-secret',

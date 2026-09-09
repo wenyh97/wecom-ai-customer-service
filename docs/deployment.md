@@ -19,12 +19,14 @@
 | `migrate` | 一次性 Alembic 迁移任务 |
 | `mysql` | MySQL 8.0，持久化 volume、utf8mb4、健康检查 |
 | `redis` | Phase 1 预留，当前应用未消费 |
+| `wechaty-bridge` | WorkPro/Wechaty Bridge（JuziBot puppet service，企业微信扫码登录） |
 
 ## 3. 首次部署
 
 1. 复制 `.env.example` 为服务器上的 `.env`，填入真实值；
 2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`WECOM_*`；
-3. 执行：
+3. 如需启动 WorkPro Bridge，再补齐：`WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`、`AI_BRIDGE_TOKEN`，必要时补 `WORKPRO_STAFF_USERID`；
+4. 执行：
 
 ```bash
 docker compose pull app migrate
@@ -32,6 +34,15 @@ docker compose --profile ops run --rm migrate
 docker compose up -d app mysql redis
 curl -f http://127.0.0.1:8000/health
 ```
+
+启用 WorkPro Bridge：
+
+```bash
+docker compose --profile workpro up -d wechaty-bridge
+docker compose --profile workpro logs -f wechaty-bridge
+```
+
+> JuziBot 试用环境建议保留 `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`；试用 token 同时只允许登录一个企业微信账号，退出后可切换账号。默认不要关闭 TLS。收费与配额以服务商公告为准，不在应用代码中硬编码。
 
 > 应用不会在启动时自动建表；必须先执行 `alembic upgrade head`（通过 `migrate` 服务完成）。
 
@@ -82,6 +93,7 @@ CD 工作流执行顺序：
 6. `docker compose pull app migrate`；
 7. `docker compose --profile ops run --rm migrate`；
 8. `docker compose up -d app mysql redis`；
+8. 如需 Bridge：`docker compose --profile workpro up -d wechaty-bridge`；
 9. `curl /health` 校验。
 
 若迁移失败，发布应停止，不应继续重启应用容器。
