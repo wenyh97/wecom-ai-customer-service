@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.errors import NotFoundError
@@ -410,6 +411,24 @@ class IdempotencyRepository:
         self.session.add(record)
         await self.session.flush()
         return record
+
+    async def reserve(self, *, tenant_id: str, key: str) -> bool:
+        existing = await self.get(key)
+        if existing is not None:
+            return False
+        record = IdempotencyRecord(
+            tenant_id=tenant_id,
+            idempotency_key=key,
+            status='processing',
+            response_payload={},
+        )
+        self.session.add(record)
+        try:
+            await self.session.flush()
+        except IntegrityError:
+            await self.session.rollback()
+            return False
+        return True
 
 
 class UnitOfWork:

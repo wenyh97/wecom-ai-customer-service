@@ -1,23 +1,39 @@
-"""/wecom/callback 路由：企业微信回调验签/解密/事件入口（占位实现）。
-
-见 docs/api-contract.md §2 与 src/app/wecom/adapter.py 顶部声明：
-本模块提供可测试的占位实现，真实生产对接前需要对照企业微信官方文档确认细节
-（TODO(confirm-with-wecom-docs)）。
-"""
+"""企业微信微信客服回调路由。"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, Response
+import uuid
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
 
 from app.api.deps import get_container
 from app.core.container import Container
 from app.core.errors import AppError
-from app.wecom.adapter import WeComCrypto, WeComSignatureVerifier
+from app.wecom.adapter import (
+    WeComCrypto,
+    WeComCryptoError,
+    WeComPayloadError,
+    WeComSignatureVerifier,
+    parse_encrypted_callback,
+    parse_kf_callback_event,
+)
 
 router = APIRouter(prefix="/wecom", tags=["wecom"])
 
 
+def _build_crypto(container: Container) -> WeComCrypto:
+    receive_id = container.settings.wecom_effective_receive_id
+    if not container.settings.wecom_token or not container.settings.wecom_encoding_aes_key or not receive_id:
+        raise AppError(
+            "wecom_not_configured",
+            "wecom kf callback token, EncodingAESKey or receive id is not configured",
+            503,
+        )
+    return WeComCrypto(aes_key=container.settings.wecom_encoding_aes_key)
+
+
 @router.get("/callback")
+@router.get("/kf/callback")
 async def verify_callback(
     msg_signature: str = Query(...),
     timestamp: str = Query(...),
@@ -29,19 +45,54 @@ async def verify_callback(
     if not verifier.verify(msg_signature, timestamp, nonce, echostr):
         raise AppError("invalid_signature", "signature verification failed", 403)
 
-    crypto = WeComCrypto(aes_key=container.settings.wecom_aes_key)
-    decrypted = crypto.decrypt(echostr)
+    try:
+        crypto = _build_crypto(container)
+        decrypted = crypto.decrypt(
+            echostr,
+            receive_id=container.settings.wecom_effective_receive_id,
+        )
+    except WeComCryptoError as exc:
+        raise AppError("invalid_wecom_payload", str(exc), 400) from exc
     return Response(content=decrypted, media_type="text/plain")
 
 
 @router.post("/callback")
+@router.post("/kf/callback")
 async def receive_callback(
+    request: Request,
+    background_tasks: BackgroundTasks,
     msg_signature: str = Query(...),
     timestamp: str = Query(...),
     nonce: str = Query(...),
     container: Container = Depends(get_container),
-) -> dict:
-    # 真实事件体的验签/解密/规范化流程占位：具体请求体格式与解密算法需要在真实
-    # 联调时对照企业微信官方文档确认（TODO(confirm-with-wecom-docs)）。
-    # 当前仅返回确认响应，供本地开发验证路由可达性。
-    return {"status": "accepted"}
+) -> Response:
+    body = (await request.body()).decode("utf-8")
+    try:
+        encrypted = parse_encrypted_callback(body)
+    except WeComPayloadError as exc:
+        raise AppError("invalid_wecom_payload", str(exc), 400) from exc
+
+    verifier = WeComSignatureVerifier(token=container.settings.wecom_token)
+    if not verifier.verify(msg_signature, timestamp, nonce, encrypted):
+        raise AppError("invalid_signature", "signature verification failed", 403)
+
+    try:
+        crypto = _build_crypto(container)
+        decrypted = crypto.decrypt(
+            encrypted,
+            receive_id=container.settings.wecom_effective_receive_id,
+        )
+        event = parse_kf_callback_event(
+            decrypted,
+            expected_receive_id=container.settings.wecom_effective_receive_id,
+        )
+    except (WeComCryptoError, WeComPayloadError) as exc:
+        raise AppError("invalid_wecom_payload", str(exc), 400) from exc
+
+    correlation_id = request.headers.get("X-Correlation-Id") or str(uuid.uuid4())
+    background_tasks.add_task(
+        container.wecom_kf_service.handle_callback_event,
+        event,
+        correlation_id,
+    )
+    return Response(content="success", media_type="text/plain")

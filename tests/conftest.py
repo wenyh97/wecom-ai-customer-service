@@ -27,7 +27,9 @@ def settings() -> Settings:
         llm_api_key='',
         embedding_api_key='',
         wecom_token='test-token',
-        wecom_aes_key='',
+        wecom_kf_secret='test-kf-secret',
+        wecom_encoding_aes_key='abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG',
+        wecom_receive_id='ww-test-corp',
         handoff_confidence_threshold=0.1,
     )
 

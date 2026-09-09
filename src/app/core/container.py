@@ -22,6 +22,7 @@ from app.services.handoff import HandoffStore
 from app.services.idempotency import DatabaseIdempotencyStore, IdempotencyStore
 from app.services.knowledge_base import KnowledgeBaseService
 from app.services.revisit import RevisitTaskStore
+from app.wecom.service import WeComKFDemoService
 
 
 class OutboundMessageDispatcher:
@@ -51,6 +52,7 @@ class Container:
     idempotency_store: IdempotencyStore
     ai_orchestrator: AIOrchestrator
     outbound_dispatcher: OutboundMessageDispatcher
+    wecom_kf_service: WeComKFDemoService
 
     async def warmup(self) -> None:
         async with self.uow_factory() as uow:
@@ -130,4 +132,17 @@ def build_container(settings: Settings) -> Container:
         ),
         ai_orchestrator=ai_orchestrator,
         outbound_dispatcher=OutboundMessageDispatcher(),
+        wecom_kf_service=WeComKFDemoService(
+            settings=settings,
+            llm_provider=llm_provider,
+            uow_factory=uow_factory,
+            conversation_store=ConversationStore(
+                default_tenant_slug=settings.default_tenant_slug,
+                default_tenant_name=settings.default_tenant_name,
+            ),
+            audit_log=AuditLogStore(
+                default_tenant_slug=settings.default_tenant_slug,
+                default_tenant_name=settings.default_tenant_name,
+            ),
+        ),
     )

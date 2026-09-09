@@ -5,7 +5,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -47,9 +47,24 @@ class Settings(BaseSettings):
     embedding_model: str = Field(default='text-embedding-3-small', alias='EMBEDDING_MODEL')
 
     wecom_corp_id: str = Field(default='', alias='WECOM_CORP_ID')
-    wecom_secret: str = Field(default='', alias='WECOM_SECRET')
+    wecom_kf_secret: str = Field(
+        default='',
+        alias='WECOM_KF_SECRET',
+        validation_alias=AliasChoices('WECOM_KF_SECRET', 'WECOM_SECRET'),
+    )
     wecom_token: str = Field(default='', alias='WECOM_TOKEN')
-    wecom_aes_key: str = Field(default='', alias='WECOM_AES_KEY')
+    wecom_encoding_aes_key: str = Field(
+        default='',
+        alias='WECOM_ENCODING_AES_KEY',
+        validation_alias=AliasChoices('WECOM_ENCODING_AES_KEY', 'WECOM_AES_KEY'),
+    )
+    wecom_receive_id: str = Field(default='', alias='WECOM_RECEIVE_ID')
+    wecom_api_base_url: str = Field(
+        default='https://qyapi.weixin.qq.com', alias='WECOM_API_BASE_URL'
+    )
+    wecom_http_timeout_seconds: float = Field(
+        default=10.0, alias='WECOM_HTTP_TIMEOUT_SECONDS'
+    )
 
     handoff_confidence_threshold: float = Field(
         default=0.35, alias='HANDOFF_CONFIDENCE_THRESHOLD'
@@ -66,6 +81,18 @@ class Settings(BaseSettings):
     @property
     def sensitive_keyword_list(self) -> list[str]:
         return [kw.strip() for kw in self.sensitive_keywords.split(',') if kw.strip()]
+
+    @property
+    def wecom_secret(self) -> str:
+        return self.wecom_kf_secret
+
+    @property
+    def wecom_aes_key(self) -> str:
+        return self.wecom_encoding_aes_key
+
+    @property
+    def wecom_effective_receive_id(self) -> str:
+        return self.wecom_receive_id or self.wecom_corp_id
 
 
 @lru_cache
