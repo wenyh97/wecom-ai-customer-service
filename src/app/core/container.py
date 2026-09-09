@@ -17,6 +17,7 @@ from app.rag.embedding import (
 from app.rag.retriever import InMemoryRetriever, Retriever
 from app.services.ai_orchestrator import AIOrchestrator
 from app.services.audit import AuditLogStore
+from app.services.bridge_chat import BridgeChatService
 from app.services.conversation import ConversationStore
 from app.services.handoff import HandoffStore
 from app.services.idempotency import DatabaseIdempotencyStore, IdempotencyStore
@@ -51,6 +52,7 @@ class Container:
     audit_log: AuditLogStore
     idempotency_store: IdempotencyStore
     ai_orchestrator: AIOrchestrator
+    bridge_chat_service: BridgeChatService
     outbound_dispatcher: OutboundMessageDispatcher
     wecom_kf_service: WeComKFDemoService
 
@@ -96,6 +98,18 @@ def build_container(settings: Settings) -> Container:
         confidence_threshold=settings.handoff_confidence_threshold,
         top_k=settings.retrieval_top_k,
     )
+    conversation_store = ConversationStore(
+        default_tenant_slug=settings.default_tenant_slug,
+        default_tenant_name=settings.default_tenant_name,
+    )
+    audit_log = AuditLogStore(
+        default_tenant_slug=settings.default_tenant_slug,
+        default_tenant_name=settings.default_tenant_name,
+    )
+    idempotency_store = DatabaseIdempotencyStore(
+        default_tenant_slug=settings.default_tenant_slug,
+        default_tenant_name=settings.default_tenant_name,
+    )
 
     def uow_factory() -> UnitOfWork:
         return UnitOfWork(session_factory)
@@ -108,10 +122,7 @@ def build_container(settings: Settings) -> Container:
         engine=engine,
         session_factory=session_factory,
         uow_factory=uow_factory,
-        conversation_store=ConversationStore(
-            default_tenant_slug=settings.default_tenant_slug,
-            default_tenant_name=settings.default_tenant_name,
-        ),
+        conversation_store=conversation_store,
         knowledge_base=KnowledgeBaseService(
             retriever=retriever,
             default_tenant_slug=settings.default_tenant_slug,
@@ -122,27 +133,22 @@ def build_container(settings: Settings) -> Container:
             default_tenant_name=settings.default_tenant_name,
         ),
         handoffs=HandoffStore(),
-        audit_log=AuditLogStore(
-            default_tenant_slug=settings.default_tenant_slug,
-            default_tenant_name=settings.default_tenant_name,
-        ),
-        idempotency_store=DatabaseIdempotencyStore(
-            default_tenant_slug=settings.default_tenant_slug,
-            default_tenant_name=settings.default_tenant_name,
-        ),
+        audit_log=audit_log,
+        idempotency_store=idempotency_store,
         ai_orchestrator=ai_orchestrator,
+        bridge_chat_service=BridgeChatService(
+            settings=settings,
+            llm_provider=llm_provider,
+            conversation_store=conversation_store,
+            idempotency_store=idempotency_store,
+            audit_log=audit_log,
+        ),
         outbound_dispatcher=OutboundMessageDispatcher(),
         wecom_kf_service=WeComKFDemoService(
             settings=settings,
             llm_provider=llm_provider,
             uow_factory=uow_factory,
-            conversation_store=ConversationStore(
-                default_tenant_slug=settings.default_tenant_slug,
-                default_tenant_name=settings.default_tenant_name,
-            ),
-            audit_log=AuditLogStore(
-                default_tenant_slug=settings.default_tenant_slug,
-                default_tenant_name=settings.default_tenant_name,
-            ),
+            conversation_store=conversation_store,
+            audit_log=audit_log,
         ),
     )

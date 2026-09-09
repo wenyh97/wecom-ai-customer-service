@@ -1,22 +1,24 @@
 # 企业微信客户 AI 客服与回访助手
 
-企业微信员工添加客户后，为客户咨询提供 AI 自动回复，并支持人工接管、受控回访、审计与部署自动化。当前仓库已包含一个可现场演示的“微信客服”最小可用 Demo：普通微信用户可通过企业微信“微信客服”入口发送文本消息，服务端调用真实 OpenAI-compatible LLM，并将回复发回同一会话。
+当前 Demo 主链路已调整为：**普通微信客户 ↔ 企业微信测试员工账号 ↔ Wechaty Puppet Service WorkPro ↔ FastAPI AI 服务**。也就是说，本仓库现在优先演示“企微员工账号直接回复客户”的闭环，而不是企业微信官方“微信客服 API”方案。
 
 > 历史 Hermes 内容已保留在 [`docs/legacy/`](docs/legacy/)；当前项目以本 README 和 `specs/` 为准。
 
 ## 当前阶段重点
 
-- **Phase 1 优先**：MySQL 持久化 + 非 RAG 核心流程 + GitHub Actions CI/CD + 单机服务器部署。
-- **明确延后**：真实 RAG / 向量检索 / Dify / 个人微信协议机器人 / 大规模队列化异步处理。
+- **Phase 1 优先**：MySQL 持久化 + 非知识库通用对话 + Wechaty WorkPro Bridge + GitHub Actions CI/CD + 单机服务器部署。
+- **明确延后**：真实 RAG / 向量检索 / Dify / 大规模队列化异步处理。
 
 ## 核心能力（当前已实现）
 
 - FastAPI 模块化单体
 - SQLAlchemy 2.x async + Alembic + MySQL/SQLite
 - 会话、消息、幂等、人工接管、回访计划/任务、审计日志持久化
-- Fake LLM / OpenAI-compatible LLM
-- 企业微信“微信客服”回调验签、AES 解密、`sync_msg` 拉取、`kf/send_msg` 文本回复
-- Docker Compose（app + mysql + redis + migrate）
+- 真实 OpenAI-compatible LLM + 缺失配置时的明确诊断
+- 新增 `/internal/chat`：Bridge 专用鉴权接口，按联系人隔离上下文并按 `message_id` 幂等
+- 独立 `bridge/` Node.js/TypeScript Wechaty Bridge，使用 `wechaty` + `wechaty-puppet-service`
+- 保留历史 `/wecom/callback` 占位/兼容代码，但它**不是**当前 Demo 的必需主链路
+- Docker Compose（app + mysql + redis + migrate + 可选 workpro profile）
 - GitHub Actions CI / CD 工作流
 
 ## 快速开始（本地 SQLite）
@@ -43,8 +45,10 @@ alembic upgrade head
 
 ```bash
 pip install -e ".[dev]"
+cd bridge && npm ci && cd ..
 ruff check .
 pytest -q
+cd bridge && npm run lint && npm run typecheck && npm run test && cd ..
 python scripts/smoke_test.py
 ```
 
@@ -59,6 +63,22 @@ docker compose up -d app mysql redis
 curl -f http://127.0.0.1:8000/health
 ```
 
+### 可选：启动 WorkPro Bridge
+
+```bash
+docker compose --profile workpro up -d wechaty-bridge
+docker compose logs -f wechaty-bridge
+```
+
+> 若需要首次扫码、直接在终端展示二维码，优先使用本地 Node 方式：
+>
+> ```bash
+> cd bridge
+> cp .env.example .env
+> npm ci
+> npm run dev
+> ```
+
 ## GitHub Actions 配置
 
 ### Secrets
@@ -69,7 +89,9 @@ curl -f http://127.0.0.1:8000/health
 | `SERVER_PASSWORD` | SSH 登录密码（配合 `sshpass` 使用） |
 | `DEPLOY_PATH` | 服务器部署目录（统一为 `/opt/wecom-ai-customer-service`） |
 | `LLM_API_KEY` / `EMBEDDING_API_KEY` | 模型密钥 |
+| `AI_BRIDGE_TOKEN` | Bridge 调用 `POST /internal/chat` 的共享密钥 |
 | `WECOM_CORP_ID` / `WECOM_KF_SECRET` / `WECOM_TOKEN` / `WECOM_RECEIVE_ID` / `WECOM_ENCODING_AES_KEY` | 企业微信微信客服回调与 API 凭证 |
+| `WECHATY_PUPPET_SERVICE_TOKEN` | 第三方 WorkPro Puppet Service Token（不要提交仓库） |
 
 > 生产环境的 `MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`MYSQL_DATABASE`、`DATABASE_URL` 统一由服务器 `/opt/wecom-ai-customer-service/.env` 管理；GitHub Actions CD 只会校验这些条目存在，并把 `APP_IMAGE` 更新为本次构建镜像，不会再覆盖整份 `.env`。
 >
@@ -87,59 +109,94 @@ curl -f http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/health
 docker compose logs -f app
 docker compose logs -f mysql
+docker compose logs -f wechaty-bridge
+```
 
-## 微信客服 Demo 配置与验证
+## WorkPro Demo 架构
 
-> 这不是 `/docs` Swagger 页面。真实演示链路是：**微信用户 → 企业微信微信客服 → `/wecom/kf/callback` → `sync_msg` → LLM → `kf/send_msg` → 微信用户收到回复**。
+主链路：
 
-### 1. 服务器 `.env` 最小必填项
+```text
+微信客户 -> 企业微信员工账号 -> WorkPro Puppet Service -> Wechaty Bridge -> FastAPI /internal/chat -> message.say(reply) -> 微信客户收到回复
+```
+
+设计要点：
+
+- 只做**文本私聊 MVP**
+- Bridge 只使用 `contact.id`、`message.id`、企微员工账号 ID，不使用显示名做主键
+- `/internal/chat` 直接调用现有 OpenAI-compatible LLM，不依赖知识库
+- 通过数据库提供按联系人隔离的基础多轮上下文与 `message_id` 幂等
+- Bridge 进程内按联系人串行；重启后队列状态会丢失，这是 Demo 局限
+
+## WorkPro 配置
+
+### 1. FastAPI `.env` 最小必填项
 
 ```dotenv
 LLM_API_KEY=你的真实模型密钥
 LLM_BASE_URL=https://你的-openai-compatible-provider/v1
 LLM_MODEL=gpt-4o-mini
-
-WECOM_CORP_ID=wwxxxxxxxxxxxxxxxx
-WECOM_KF_SECRET=微信客服 secret
-WECOM_TOKEN=企业微信后台配置的回调 Token
-WECOM_RECEIVE_ID=通常填企业 CorpID；若官方页面给了独立 receive id 则填该值
-WECOM_ENCODING_AES_KEY=企业微信后台配置的 43 位 EncodingAESKey
-WECOM_API_BASE_URL=https://qyapi.weixin.qq.com
-WECOM_HTTP_TIMEOUT_SECONDS=10
+LLM_TIMEOUT_SECONDS=15
+AI_BRIDGE_TOKEN=仅供 bridge 使用的共享密钥
 ```
 
-- 兼容旧变量名：应用仍会读取 `WECOM_SECRET` → `WECOM_KF_SECRET`、`WECOM_AES_KEY` → `WECOM_ENCODING_AES_KEY`。
-- 若 `LLM_API_KEY` 留空，微信客服 Demo 会明确回复“未配置真实 AI”，不会伪装成真实大模型答案。
+- 若未配置 `LLM_API_KEY`，`POST /internal/chat` 会明确返回诊断错误，不会伪装成真实 AI。
+- `AI_BRIDGE_TOKEN` 必须同时配置在 FastAPI 和 Bridge 侧，但绝不能提交到仓库。
 
-### 2. 企业微信管理后台配置步骤
+### 2. Bridge 环境变量样例
 
-1. 登录企业微信管理后台，进入 **微信客服**。
-2. 创建或选择一个客服账号，取得 **Secret**。
-3. 在 **API / 回调配置** 中填写：
-   - **URL**：`https://你的域名/wecom/kf/callback`
-   - **Token**：与 `WECOM_TOKEN` 保持一致
-   - **EncodingAESKey**：与 `WECOM_ENCODING_AES_KEY` 保持一致
-4. 保存时企业微信会发起 GET 校验；服务端会验证签名并解密 `echostr`。
-5. 配置完成后，确保该域名公网可达并已启用 HTTPS。
+请参考 [`bridge/.env.example`](bridge/.env.example)，至少需要：
 
-### 3. 二维码与现场测试流程
-
-1. 在企业微信微信客服后台生成并展示客服二维码。
-2. 使用普通微信测试账号扫码进入微信客服会话。
-3. 发送文本消息，例如“你好”“请介绍一下你们的产品”。
-4. 服务端会收到 `kf_msg_or_event`，随后调用：
-   - `GET /cgi-bin/gettoken`
-   - `POST /cgi-bin/kf/sync_msg`
-   - `POST /cgi-bin/kf/send_msg`
-5. 微信用户应在同一客服会话里收到 AI 文本回复。
-
-### 4. 本地 / 服务器排障
-
-#### 健康检查
-
-```bash
-curl -i http://127.0.0.1:8000/health
+```dotenv
+WECHATY_PUPPET=wechaty-puppet-service
+WECHATY_PUPPET_SERVICE_TOKEN=由 WorkPro Puppet Service 提供方发放
+AI_API_BASE_URL=http://127.0.0.1:8000
+AI_BRIDGE_TOKEN=与 FastAPI 保持一致
+BRIDGE_MESSAGE_TIMEOUT_MS=20000
+BRIDGE_API_MAX_RETRIES=1
+BRIDGE_REPLY_MAX_LENGTH=500
+BRIDGE_MAX_MESSAGE_AGE_SECONDS=180
+BRIDGE_CONTACT_WHITELIST=
 ```
+
+### 3. WorkPro Token 获取说明
+
+- `wechaty-puppet-service` 官方 npm / GitHub 用法：
+  - <https://www.npmjs.com/package/wechaty-puppet-service>
+  - <https://github.com/wechaty/wechaty-puppet-service>
+- 本项目使用的是 **Wechaty 第三方 Puppet Service / WorkPro 方案**，**不是**企业微信官方公开 API。
+- 当前试用、开通方式、定价和风控要求，请**直接向 WorkPro 服务商确认**；如果服务商页面未明确承诺，不要假定“保证有 7 天试用”。
+
+### 4. 最小验收流程
+
+1. 向 WorkPro 服务商取得 Token。
+2. 在服务器 `.env` 和/或 `bridge/.env` 填入 `LLM_*`、`AI_BRIDGE_TOKEN`、`WECHATY_PUPPET_SERVICE_TOKEN`。
+3. 启动 FastAPI：
+   ```bash
+   docker compose up -d app mysql redis
+   ```
+4. 启动 Bridge：
+   ```bash
+   docker compose --profile workpro up wechaty-bridge
+   ```
+   或本地：
+   ```bash
+   cd bridge && npm run dev
+   ```
+5. 用**独立测试企微员工账号**扫码登录。
+6. 普通微信外部联系人给该员工发送“你好”。
+7. 确认客户收到 AI 回复。
+8. 再发送“我刚才问了什么”，验证基础多轮上下文。
+
+### 5. 安全与合规提醒
+
+- **不要使用核心员工账号**做 Demo，只使用独立测试员工账号。
+- **不要提交 `WECHATY_PUPPET_SERVICE_TOKEN`、`AI_BRIDGE_TOKEN`、`LLM_API_KEY`**。
+- WorkPro 是第三方服务，第三方**可能接触聊天元数据或消息内容**。
+- 第三方 Puppet Service 依赖存在服务可用性、隐私、账号风控和平台条款风险，请自行评估。
+- 默认不要关闭 TLS。若服务商当前文档要求兼容开关，再显式配置并记录风险。
+
+### 6. 本地 / 服务器排障
 
 #### Compose 配置校验
 
@@ -150,27 +207,37 @@ docker compose -f docker-compose.yml -f docker-compose.ci.yml config
 rm .env
 ```
 
-#### 查看应用日志
+#### 查看日志
 
 ```bash
 docker compose logs --tail=200 app
+docker compose logs --tail=200 wechaty-bridge
 ```
 
-日志会保留必要的排障字段（如 callback 类型、消息数量、msgid），但不会记录 access_token、secret、EncodingAESKey 或客户消息正文。
+日志只保留必要排障字段（例如 `message_id`、`contact_id`、`staff_userid`、reply 长度），不会记录 Token 或完整客户消息正文。
 
-#### 手动验证回调地址可达
+#### 手动调用 Bridge 内部接口
 
 ```bash
-curl -i "https://你的域名/wecom/kf/callback?msg_signature=invalid&timestamp=1700000000&nonce=test&echostr=test"
+AUTH_HEADER="$(printf '%s: %s %s' Authorization Bearer "$AI_BRIDGE_TOKEN")"
+curl -i \
+  -H "$AUTH_HEADER" \
+  -H "Content-Type: application/json" \
+  http://127.0.0.1:8000/internal/chat \
+  -d '{
+    "conversation_key":"wechaty-workpro:staff-1:contact-1",
+    "contact_id":"contact-1",
+    "staff_userid":"staff-1",
+    "message_id":"msg-1",
+    "text":"你好"
+  }'
 ```
 
-预期未通过验签时返回 `4xx`，说明路由已暴露；正式联调时应由企业微信后台完成真实验签。
+### 7. 已知局限
 
-### 5. Demo 局限
-
-- 当前使用 FastAPI `BackgroundTasks` 做回调后的异步处理，优先保证 MVP 简单与稳定；若进程在回调成功返回后立刻退出，后台任务可能丢失。
-- 当前只支持微信客服文本消息。
-- 当前仅保留基础多轮上下文，不依赖知识库/RAG。
+- 只处理一对一文本私聊，不处理群聊、图片、文件、好友申请或营销能力。
+- Bridge 采用进程内串行队列；若 Bridge 在处理时重启，队列状态不会恢复。
+- 仓库中仍保留旧 `/wecom/kf/callback` 兼容实现，但它不是当前 Demo 主链路。
 
 ## 手动回滚与备份
 

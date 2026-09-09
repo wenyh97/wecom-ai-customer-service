@@ -52,6 +52,7 @@ class ConversationStore:
         customer_external_userid: str,
         staff_userid: str,
         conversation_id: str | None = None,
+        channel: str = 'wecom',
     ) -> Conversation:
         tenant_id, customer_id, staff_id = await self._ensure_context(
             uow, customer_external_userid, staff_userid
@@ -67,7 +68,12 @@ class ConversationStore:
                     status=conversation.status,
                     messages=[self._to_message(message.created_at, message.role, message.content) for message in messages],
                 )
-        conversation = await uow.conversations.get_or_create(tenant_id, customer_id, staff_id)
+        conversation = await uow.conversations.get_or_create(
+            tenant_id,
+            customer_id,
+            staff_id,
+            channel=channel,
+        )
         messages = await uow.messages.list_recent(conversation.id)
         return Conversation(
             conversation_id=conversation.id,
