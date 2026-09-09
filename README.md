@@ -20,9 +20,11 @@
 - 会话、消息、幂等、人工接管、回访计划/任务、审计日志持久化
 - `/internal/chat`：Bridge 专用内部接口，带 ****** 和 `message_id` 幂等
 - 独立 `bridge/` Node.js/TypeScript Wechaty Bridge
+- Bridge 运行时 Node 版本：`20.x` / `22.x` LTS（Docker 基础镜像固定为 `node:22-bookworm-slim`）
 - Bridge 运行时固定使用：
   - `@juzi/wechaty`
   - `@juzi/wechaty-puppet-service`
+  - `@grpc/grpc-js@1.13.4`（与 `wechaty-token@1.1.2` resolver listener API 兼容）
   - `puppet: '@juzi/wechaty-puppet-service'`
   - `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`
 - Bridge 安全策略：
@@ -126,6 +128,8 @@ npm ci
 npm run dev
 ```
 
+- 必须使用 lockfile 安装（`npm ci`），不要跳过或改用 `npm install` 直接在线解析新版本。
+
 ### Compose 启动 Bridge
 
 ```bash
@@ -134,6 +138,18 @@ docker compose up -d app mysql redis
 docker compose --profile workpro up -d wechaty-bridge
 docker compose --profile workpro logs -f wechaty-bridge
 ```
+
+若 Bridge 曾因 resolver 异常进入重启循环，先清理旧容器，再强制拉取基础镜像并无缓存重建：
+
+```bash
+docker compose --profile workpro stop wechaty-bridge || true
+docker compose --profile workpro rm -f wechaty-bridge || true
+# 同步最新 main 的 bridge/ 目录
+docker compose --profile workpro build --no-cache --pull wechaty-bridge
+docker compose --profile workpro up wechaty-bridge
+```
+
+预期不再出现 `ERR_INVALID_ARG_TYPE` resolver callback 异常，随后进入 scan/二维码流程。
 
 ## 生产部署（Docker Compose + MySQL）
 
