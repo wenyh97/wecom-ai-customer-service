@@ -24,7 +24,7 @@
 - Bridge 运行时固定使用：
   - `@juzi/wechaty`
   - `@juzi/wechaty-puppet-service`
-  - `@grpc/grpc-js@1.13.4`（与 `wechaty-token@1.1.2` resolver listener API 兼容）
+  - `@grpc/grpc-js@1.13.5`（与 `wechaty-token@1.1.2` resolver listener API 兼容，且包含已知崩溃漏洞修复）
   - `puppet: '@juzi/wechaty-puppet-service'`
   - `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`
 - Bridge 安全策略：

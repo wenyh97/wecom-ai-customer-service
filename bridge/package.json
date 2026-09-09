@@ -8,7 +8,7 @@
     "node": ">=20 <24"
   },
   "overrides": {
-    "@grpc/grpc-js": "1.13.4"
+    "@grpc/grpc-js": "1.13.5"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@grpc/grpc-js": "1.13.4",
+    "@grpc/grpc-js": "1.13.5",
     "@juzi/wechaty": "1.0.166",
     "@juzi/wechaty-puppet-service": "1.0.129",
     "qrcode-terminal": "0.12.0"

@@ -14,7 +14,7 @@ describe('bridge runtime compatibility', () => {
     const lockfile = JSON.parse(readFileSync(join(bridgeRoot, 'package-lock.json'), 'utf8')) as {
       packages: Record<string, { version?: string }>
     }
-    expect(lockfile.packages['node_modules/@grpc/grpc-js']?.version).toBe('1.13.4')
+    expect(lockfile.packages['node_modules/@grpc/grpc-js']?.version).toBe('1.13.5')
 
     const grpcResolverDts = readFileSync(join(bridgeRoot, 'node_modules/@grpc/grpc-js/build/src/resolver.d.ts'), 'utf8')
     const wechatyResolver = readFileSync(join(bridgeRoot, 'node_modules/wechaty-token/dist/cjs/src/resolver-wechaty.js'), 'utf8')
