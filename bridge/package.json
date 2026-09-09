@@ -9,7 +9,7 @@
     "dev": "tsx src/index.ts",
     "lint": "eslint src tests",
     "start": "node dist/src/index.js",
-    "test": "vitest run",
+    "test": "vitest run tests",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
