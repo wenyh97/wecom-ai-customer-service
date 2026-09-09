@@ -9,9 +9,9 @@ import json
 import struct
 from dataclasses import dataclass
 from typing import Any
-from xml.etree import ElementTree
 
 from Crypto.Cipher import AES
+from defusedxml import ElementTree
 
 _BLOCK_SIZE = 32
 
