@@ -24,7 +24,7 @@
 ## 3. 首次部署
 
 1. 复制 `.env.example` 为服务器上的 `.env`，填入真实值；
-2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`LLM_AUTH_MODE`（默认 `bearer`，Azure OpenAI 用 `api-key`）、`WECOM_*`；
+2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`LLM_AUTH_MODE`（默认 `bearer`，Azure OpenAI 用 `api-key`）、`LLM_SEND_TEMPERATURE`（默认 `true`，不接受 `temperature` 的 Azure / 推理模型改为 `false`）、`WECOM_*`；
 3. 如需启动 WorkPro Bridge，再补齐：`WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`、`AI_BRIDGE_TOKEN`，必要时补 `WORKPRO_STAFF_USERID`；
 4. 执行：
 
@@ -50,6 +50,7 @@ Azure OpenAI 示例（保持 `/openai/v1/chat/completions` 路径）：
 LLM_BASE_URL=https://你的资源名.openai.azure.com/openai/v1/
 LLM_MODEL=gpt-5.6-luna
 LLM_AUTH_MODE=api-key
+LLM_SEND_TEMPERATURE=false
 ```
 
 > 应用不会在启动时自动建表；必须先执行 `alembic upgrade head`（通过 `migrate` 服务完成）。

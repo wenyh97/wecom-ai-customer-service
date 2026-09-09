@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     llm_auth_mode: Literal['bearer', 'api-key'] = Field(
         default='bearer', alias='LLM_AUTH_MODE'
     )
+    llm_send_temperature: bool = Field(default=True, alias='LLM_SEND_TEMPERATURE')
     llm_timeout_seconds: float = Field(default=15.0, alias='LLM_TIMEOUT_SECONDS')
     ai_bridge_token: str = Field(default='', alias='AI_BRIDGE_TOKEN')
 

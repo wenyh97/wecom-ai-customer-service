@@ -86,11 +86,13 @@ class OpenAICompatibleLLMProvider:
         api_key: str,
         model: str,
         auth_mode: LLMAuthMode = 'bearer',
+        send_temperature: bool = True,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._model = model
         self._auth_mode = auth_mode
+        self._send_temperature = send_temperature
 
     async def generate(
         self,
@@ -101,9 +103,10 @@ class OpenAICompatibleLLMProvider:
     ) -> LLMResponse:
         payload = {
             "model": self._model,
-            "temperature": temperature,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
+        if self._send_temperature:
+            payload["temperature"] = temperature
         headers = (
             {'api-key': self._api_key}
             if self._auth_mode == 'api-key'
