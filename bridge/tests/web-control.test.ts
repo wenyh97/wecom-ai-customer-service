@@ -171,6 +171,40 @@ describe('BridgeWebControlPlane', () => {
     expect(sse.body).toContain('waiting-scan')
   })
 
+  it('renders demo login and marketing workspace pages while keeping bridge controls', async () => {
+    const { baseUrl } = await startControlPlane()
+
+    const response = await fetch(`${baseUrl}/`)
+    const html = await response.text()
+
+    expect(response.status).toBe(200)
+    expect(html).toContain('麻花 AI 营销工作台（Demo）')
+    expect(html).toContain('Demo 登录')
+    expect(html).toContain('id="login-username"')
+    expect(html).toContain('value="admin"')
+    expect(html).toContain('用户名固定为 <strong>admin</strong>')
+    expect(html).toContain('对话创作')
+    expect(html).toContain('内容资产')
+    expect(html).toContain('工具')
+    expect(html).toContain('AI 知识库（RAG）')
+    expect(html).toContain('数据统计')
+    expect(html).toContain('管理')
+    expect(html).toContain('欢迎语')
+    expect(html).toContain('定时推送')
+    expect(html).toContain('快捷回复')
+    expect(html).toContain('会话记录')
+    expect(html).toContain('AI 客户画像分析')
+    expect(html).toContain('AI 老客维护策略推荐')
+    expect(html).toContain('连接状态（保留真实 Bridge 能力）')
+    expect(html).toContain('id="bridge-qr"')
+    expect(html).toContain('id="verify-form"')
+    expect(html).toContain('/api/session')
+    expect(html).toContain('/api/status')
+    expect(html).toContain('/api/events')
+    expect(html).toContain('/api/verify-code')
+    expect(html).toContain('后端能力即将接入')
+  })
+
   it('requires authentication and csrf protection for verify-code submission', async () => {
     const submit = vi.fn(async () => {})
     const { baseUrl, bot } = await startControlPlane({ submitter: { submit } })
@@ -235,6 +269,30 @@ describe('BridgeWebControlPlane', () => {
     })
 
     expect(repeated.status).toBe(409)
+  })
+
+  it('destroys session on authenticated logout request', async () => {
+    const { baseUrl } = await startControlPlane()
+    const { cookie, csrfToken } = await createSession(baseUrl)
+
+    const logout = await fetch(`${baseUrl}/api/session`, {
+      method: 'DELETE',
+      headers: {
+        Cookie: cookie,
+        Origin: baseUrl,
+        'X-CSRF-Token': csrfToken,
+      },
+    })
+    const payload = await logout.json() as { ok: boolean }
+
+    expect(logout.status).toBe(200)
+    expect(payload.ok).toBe(true)
+    expect(logout.headers.get('set-cookie')).toContain('Max-Age=0')
+
+    const statusAfterLogout = await fetch(`${baseUrl}/api/status`, {
+      headers: { Cookie: cookie },
+    })
+    expect(statusAfterLogout.status).toBe(401)
   })
 
   it('handles invalid format, submit errors, timeout, and state cleanup without leaking codes', async () => {
