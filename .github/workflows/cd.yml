@@ -173,7 +173,6 @@ jobs:
           curl -fsS "http://127.0.0.1:$APP_PORT_VALUE/health" > /dev/null
           docker compose ps
           printf '%s\n' "$APP_IMAGE_REF" > .current_app_image
-          printf '%s\n' "$BRIDGE_IMAGE_REF" > .current_bridge_image
           if [ "$DEPLOY_WORKPRO_ENABLED" = true ]; then
             docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge
             BRIDGE_PORT_VALUE=$(env_value BRIDGE_WEB_PORT)
@@ -208,6 +207,7 @@ jobs:
               sleep 5
             done
             curl -fsS "http://127.0.0.1:$BRIDGE_PORT_VALUE/health" > /dev/null
+            printf '%s\n' "$BRIDGE_IMAGE_REF" > .current_bridge_image
             docker compose --profile workpro ps
           fi
           EOF
