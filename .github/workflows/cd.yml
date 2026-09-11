@@ -157,15 +157,15 @@ jobs:
             require_env_key WECHATY_PUPPET_SERVICE_TOKEN
             require_env_key AI_BRIDGE_TOKEN
             require_env_key BRIDGE_WEB_TOKEN
-            docker compose --profile workpro pull app migrate wechaty-bridge
+            APP_IMAGE="$APP_IMAGE_REF" BRIDGE_IMAGE="$BRIDGE_IMAGE_REF" docker compose --profile workpro pull app migrate wechaty-bridge
           else
             DEPLOY_WORKPRO_ENABLED=false
             echo "WorkPro disabled"
-            docker compose pull app migrate
+            APP_IMAGE="$APP_IMAGE_REF" docker compose pull app migrate
           fi
           docker compose pull mysql redis
-          docker compose --profile ops run --rm migrate
-          docker compose up -d --no-build app mysql redis
+          APP_IMAGE="$APP_IMAGE_REF" docker compose --profile ops run --rm migrate
+          APP_IMAGE="$APP_IMAGE_REF" docker compose up -d --no-build app mysql redis
           APP_PORT_VALUE=$(env_value APP_PORT)
           if [ -z "$APP_PORT_VALUE" ]; then
             APP_PORT_VALUE=8000
@@ -186,7 +186,7 @@ jobs:
               docker compose ps
               exit 1
             fi
-            docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge
+            APP_IMAGE="$APP_IMAGE_REF" BRIDGE_IMAGE="$BRIDGE_IMAGE_REF" docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge
             BRIDGE_PORT_VALUE=$(env_value BRIDGE_WEB_PORT)
             if [ -z "$BRIDGE_PORT_VALUE" ]; then
               BRIDGE_PORT_VALUE=18080

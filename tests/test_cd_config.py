@@ -14,10 +14,10 @@ def test_cd_builds_and_deploys_bridge_image() -> None:
     assert 'context: ./bridge' in workflow
     assert 'file: ./bridge/Dockerfile' in workflow
     assert 'BRIDGE_IMAGE_REF: ${{ env.BRIDGE_IMAGE_NAME }}:sha-${{ github.sha }}' in workflow
-    assert 'docker compose --profile workpro pull app migrate wechaty-bridge' in workflow
+    assert 'APP_IMAGE="$APP_IMAGE_REF" BRIDGE_IMAGE="$BRIDGE_IMAGE_REF" docker compose --profile workpro pull app migrate wechaty-bridge' in workflow
     assert 'docker compose pull mysql redis' in workflow
     assert 'app container missing before bridge deploy' in workflow
-    assert 'docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge' in workflow
+    assert 'APP_IMAGE="$APP_IMAGE_REF" BRIDGE_IMAGE="$BRIDGE_IMAGE_REF" docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge' in workflow
 
 
 def test_cd_gates_workpro_deploy_and_updates_server_env() -> None:
@@ -28,6 +28,7 @@ def test_cd_gates_workpro_deploy_and_updates_server_env() -> None:
     assert 'require_env_key WECHATY_PUPPET_SERVICE_TOKEN' in workflow
     assert 'require_env_key AI_BRIDGE_TOKEN' in workflow
     assert 'require_env_key BRIDGE_WEB_TOKEN' in workflow
+    assert 'APP_IMAGE="$APP_IMAGE_REF" docker compose --profile ops run --rm migrate' in workflow
     assert '/^BRIDGE_IMAGE=/ { print "BRIDGE_IMAGE=" bridge_image; bridge_updated = 1; next }' in workflow
 
 
