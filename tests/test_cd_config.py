@@ -35,7 +35,8 @@ def test_compose_uses_bridge_image_and_healthcheck() -> None:
     assert 'image: ${BRIDGE_IMAGE:-ghcr.io/wenyh97/wecom-ai-customer-service-bridge:latest}' in compose
     assert 'context: ./bridge' in compose
     assert '"${BRIDGE_WEB_BIND_HOST:-127.0.0.1}:${BRIDGE_WEB_PORT:-18080}:${BRIDGE_WEB_PORT:-18080}"' in compose
-    assert "fetch('http://127.0.0.1:' + port + '/health')" in compose
+    assert "const http = require('node:http');" in compose
+    assert "path: '/health'," in compose
 
 
 def test_env_example_documents_cd_managed_bridge_settings() -> None:
