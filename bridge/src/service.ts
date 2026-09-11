@@ -2,12 +2,19 @@ import './grpc-resolver-compat'
 
 import qrcodeTerminal from 'qrcode-terminal'
 import { ScanStatus, WechatyBuilder, log, types, type Contact, type Message, type Wechaty } from '@juzi/wechaty'
+import { createVerifyCodeSubmitter } from './verify-code'
+import { BridgeWebControlPlane } from './web-control'
 
 export interface BridgeConfig {
   puppetServiceToken: string
   puppetServiceAuthority: string
   aiApiBaseUrl: string
   aiBridgeToken: string
+  webHost: string
+  webPort: number
+  webToken: string
+  webSessionTtlMs: number
+  webVerifyTimeoutMs: number
   messageTimeoutMs: number
   apiMaxRetries: number
   replyMaxLength: number
@@ -74,6 +81,11 @@ function envBoolean (value: string | undefined, fallback: boolean): boolean {
   return value.trim().toLowerCase() === 'true'
 }
 
+function isLoopbackHost (value: string): boolean {
+  const normalized = value.trim().toLowerCase()
+  return normalized === '127.0.0.1' || normalized === '::1' || normalized === 'localhost'
+}
+
 function redactText (value: unknown): string {
   return SENSITIVE_PATTERNS.reduce(
     (current, pattern) => current.replace(pattern, (_, prefix: string) => `${prefix}[REDACTED]`),
@@ -117,6 +129,11 @@ export function loadConfig (env: NodeJS.ProcessEnv): BridgeConfig {
     puppetServiceAuthority: (env.WECHATY_PUPPET_SERVICE_AUTHORITY ?? JUZIBOT_TRIAL_AUTHORITY).trim() || JUZIBOT_TRIAL_AUTHORITY,
     aiApiBaseUrl,
     aiBridgeToken,
+    webHost: (env.BRIDGE_WEB_HOST ?? '127.0.0.1').trim() || '127.0.0.1',
+    webPort: envNumber(env.BRIDGE_WEB_PORT, 18080),
+    webToken: (env.BRIDGE_WEB_TOKEN ?? '').trim(),
+    webSessionTtlMs: envNumber(env.BRIDGE_WEB_SESSION_TTL_MS, 12 * 60 * 60 * 1000),
+    webVerifyTimeoutMs: envNumber(env.BRIDGE_WEB_VERIFY_TIMEOUT_MS, 5 * 60 * 1000),
     messageTimeoutMs: envNumber(env.BRIDGE_MESSAGE_TIMEOUT_MS, 20000),
     apiMaxRetries: Math.max(0, envNumber(env.BRIDGE_API_MAX_RETRIES, 1)),
     replyMaxLength: envNumber(env.BRIDGE_REPLY_MAX_LENGTH, 500),
@@ -409,14 +426,32 @@ export function createBridgeApplication (
   config: BridgeConfig,
   fetchImpl: typeof fetch = fetch,
   logger: BridgeLogger = createConsoleLogger(),
-): { bot: Wechaty, bridge: WechatyWorkProBridge, start: () => Promise<void> } {
+): { bot: Wechaty, bridge: WechatyWorkProBridge, controlPlane: BridgeWebControlPlane, start: () => Promise<void> } {
+  if (config.webToken === '' && !isLoopbackHost(config.webHost)) {
+    throw new Error('BRIDGE_WEB_TOKEN is required when BRIDGE_WEB_HOST is not loopback')
+  }
   const bot = createWechatyBot(config)
   const apiClient = new HttpBridgeApiClient(config, fetchImpl)
   const bridge = new WechatyWorkProBridge(config, apiClient, logger)
+  const controlPlane = new BridgeWebControlPlane(
+    config,
+    bot,
+    createVerifyCodeSubmitter(bot),
+    logger,
+  )
   attachWechatyHandlers(bot, bridge, logger)
   return {
     bot,
     bridge,
-    start: async () => { await bot.start() },
+    controlPlane,
+    start: async () => {
+      await controlPlane.start()
+      try {
+        await bot.start()
+      } catch (error) {
+        await controlPlane.stop().catch(() => {})
+        throw error
+      }
+    },
   }
 }

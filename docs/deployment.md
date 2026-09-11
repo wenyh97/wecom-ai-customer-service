@@ -25,8 +25,9 @@
 
 1. 复制 `.env.example` 为服务器上的 `.env`，填入真实值；
 2. 至少配置：`MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`、`LLM_API_KEY`（如需要真实模型）、`LLM_AUTH_MODE`（默认 `bearer`，Azure OpenAI 用 `api-key`）、`LLM_SEND_TEMPERATURE`（默认 `true`，不接受 `temperature` 的 Azure / 推理模型改为 `false`）、`WECOM_*`；
-3. 如需启动 WorkPro Bridge，再补齐：`WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`、`AI_BRIDGE_TOKEN`，必要时补 `WORKPRO_STAFF_USERID`；
-4. 执行：
+3. 如需启动 WorkPro Bridge，再补齐：`WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`、`WECHATY_PUPPET_SERVICE_NO_TLS_INSECURE_CLIENT=true`、`AI_BRIDGE_TOKEN`、`BRIDGE_WEB_TOKEN`，必要时补 `WORKPRO_STAFF_USERID`；
+4. 推荐同时确认 `BRIDGE_WEB_PORT`（默认 `18080`）、`BRIDGE_WEB_BIND_HOST=127.0.0.1`；Docker Compose 默认仅把控制台发布到服务器本机回环地址，供 SSH 隧道或服务器本地浏览器访问；
+5. 执行：
 
 ```bash
 docker compose pull app migrate
@@ -38,13 +39,27 @@ curl -f http://127.0.0.1:8000/health
 启用 WorkPro Bridge：
 
 ```bash
-docker compose --profile workpro up -d wechaty-bridge
+docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 docker compose --profile workpro logs -f wechaty-bridge
+```
+
+如从本地电脑访问，先建立 SSH 隧道，再打开浏览器：
+
+```bash
+ssh -L 18080:127.0.0.1:18080 TonyAdmin@服务器
+```
+
+随后访问：
+
+```text
+http://127.0.0.1:18080/
 ```
 
 > Bridge 运行时仅支持 Node `20.x/22.x` LTS；仓库中 `bridge/Dockerfile` 固定 `node:22-bookworm-slim`，依赖必须通过 `bridge/package-lock.json` + `npm ci` 安装。当前审计策略为固定 `@grpc/grpc-js@1.13.5`，并在仓库内用 `bridge/src/grpc-resolver-compat.ts` 把 `wechaty-token@1.1.2` 的旧 `{host, port}` resolver 结果包装成 endpoint-list 形状。
 
-> JuziBot 试用环境建议保留 `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`；试用 token 同时只允许登录一个企业微信账号，退出后可切换账号。默认不要关闭 TLS。收费与配额以服务商公告为准，不在应用代码中硬编码。
+> JuziBot 试用环境建议保留 `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`；当前生产现网 discovery 返回 `101.126.67.87:4001` 明文 gRPC 端口，因此运行 Bridge 时需要 `WECHATY_PUPPET_SERVICE_NO_TLS_INSECURE_CLIENT=true`。本任务不会在代码里偷偷改写该行为。试用 token 同时只允许登录一个企业微信账号，退出后可切换账号。收费与配额以服务商公告为准，不在应用代码中硬编码。
+
+> 首次启动 Bridge 仍建议保持前台运行以观察日志，但登录操作已转移到浏览器控制台完成：通过页面查看二维码，扫码后若手机端提示验证码，则在页面输入提交；不要再通过 SSH 终端输入验证码。
 
 Azure OpenAI 示例（保持 `/openai/v1/chat/completions` 路径）：
 
@@ -104,7 +119,7 @@ CD 工作流执行顺序：
 6. `docker compose pull app migrate`；
 7. `docker compose --profile ops run --rm migrate`；
 8. `docker compose up -d app mysql redis`；
-8. 如需 Bridge：`docker compose --profile workpro up -d wechaty-bridge`；
+8. 如需 Bridge：`docker compose --profile workpro up -d --no-build --no-deps wechaty-bridge`；
 9. `curl /health` 校验。
 
 若迁移失败，发布应停止，不应继续重启应用容器。
@@ -115,7 +130,11 @@ CD 工作流执行顺序：
 cd /opt/wecom-ai-customer-service
 docker compose --profile workpro stop wechaty-bridge || true
 docker compose --profile workpro rm -f wechaty-bridge || true
+# 同步最新 main 的 bridge/ 目录及 docker-compose.yml
 docker compose --profile workpro build --no-cache --pull wechaty-bridge
+# 推荐先通过 SSH 隧道访问 Web 控制页，再启动
+# 本地执行：ssh -L 18080:127.0.0.1:18080 TonyAdmin@服务器
+# 服务器执行：
 docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 ```
 
@@ -134,6 +153,8 @@ docker compose --profile workpro run --rm --entrypoint sh wechaty-bridge -lc \
 - 镜像内存在编译后的 `dist/src/grpc-resolver-compat.js`
 - Bridge 日志不再出现 `ERR_INVALID_ARG_TYPE`
 - Bridge 日志不再出现 `Cannot use 'in' operator to search for 'port' in undefined`
+- 本地浏览器通过 SSH 隧道访问 `http://127.0.0.1:18080/` 后可以看到二维码
+- 扫码后如页面提示验证码，可直接在页面提交；提交后日志继续出现 `login` / `ready`
 - Bridge 成功进入 scan/二维码流程；这比“进程启动数秒未退出”更重要
 
 ## 6. 日志与健康检查

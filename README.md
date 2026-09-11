@@ -106,8 +106,14 @@ LLM_SEND_TEMPERATURE=false
 ```dotenv
 WECHATY_PUPPET_SERVICE_TOKEN=由 JuziBot / WorkPro 服务商发放
 WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com
+WECHATY_PUPPET_SERVICE_NO_TLS_INSECURE_CLIENT=true
 AI_API_BASE_URL=http://127.0.0.1:8000
 AI_BRIDGE_TOKEN=与 FastAPI 保持一致
+BRIDGE_WEB_HOST=127.0.0.1
+BRIDGE_WEB_PORT=18080
+BRIDGE_WEB_TOKEN=至少 16 位随机共享访问令牌
+BRIDGE_WEB_SESSION_TTL_MS=43200000
+BRIDGE_WEB_VERIFY_TIMEOUT_MS=300000
 BRIDGE_MESSAGE_TIMEOUT_MS=20000
 BRIDGE_API_MAX_RETRIES=1
 BRIDGE_REPLY_MAX_LENGTH=500
@@ -117,7 +123,8 @@ WORKPRO_AUTO_ACCEPT_FRIENDSHIP=false
 WORKPRO_STAFF_USERID=
 ```
 
-- 默认不要关闭 TLS。
+- 当前 JuziBot 试用 discovery 返回的 `101.126.67.87:4001` 为明文 gRPC 端口，生产运行需显式设置 `WECHATY_PUPPET_SERVICE_NO_TLS_INSECURE_CLIENT=true`；本仓库不会替你在代码中偷偷改掉该行为。
+- Web 控制台默认地址为 `http://127.0.0.1:18080/`（本地直接运行时）；验证码输入只通过受保护的 `POST /api/verify-code` 提交，不会拼接到 URL。
 - 试用 token、真实 LLM key、`AI_BRIDGE_TOKEN` 都不能提交。
 
 ### 本地启动 Bridge
@@ -126,10 +133,14 @@ WORKPRO_STAFF_USERID=
 cd bridge
 cp .env.example .env
 npm ci
+set -a
+. ./.env
+set +a
 npm run dev
 ```
 
 - 必须使用 lockfile 安装（`npm ci`），不要跳过或改用 `npm install` 直接在线解析新版本。
+- 首次启动建议保持前台运行以观察日志，但扫码和验证码输入改为在浏览器控制台完成，不再依赖 SSH 终端输入。
 - 本次二阶段 resolver 根因不是 callback 是否存在，而是 `wechaty-token` 旧 resolver 把 `TcpSubchannelAddress[]` 直接传给了 `grpc-js@1.13.5` 已切换到 endpoint-list 语义的 `onSuccessfulResolution(...)`。验收标准必须是 **不再出现 `ERR_INVALID_ARG_TYPE` / `Cannot use 'in' operator to search for 'port' in undefined`，并继续进入 scan/二维码流程**。
 
 ### Compose 启动 Bridge
@@ -137,9 +148,23 @@ npm run dev
 ```bash
 cp .env.example .env
 docker compose up -d app mysql redis
-docker compose --profile workpro up -d wechaty-bridge
+docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 docker compose --profile workpro logs -f wechaty-bridge
 ```
+
+推荐先建立 SSH 隧道，再在本地浏览器打开控制台：
+
+```bash
+ssh -L 18080:127.0.0.1:18080 TonyAdmin@服务器
+```
+
+然后在本地浏览器访问：
+
+```text
+http://127.0.0.1:18080/
+```
+
+> `docker-compose.yml` 默认把宿主机暴露地址限制为 `127.0.0.1:${BRIDGE_WEB_PORT}`，仅供 SSH 隧道或服务器本机访问；不要直接把控制台端口发布到公网。
 
 若 Bridge 曾因 resolver 异常进入重启循环，先清理旧容器，再强制拉取基础镜像并无缓存重建：
 
@@ -165,6 +190,7 @@ docker compose --profile workpro run --rm --entrypoint sh wechaty-bridge -lc \
 - `wechaty-token` 为 `1.1.2`
 - 兼容层已编译进镜像
 - 启动日志不再出现 `ERR_INVALID_ARG_TYPE` 或 `Cannot use '\''in'\'' operator to search for '\''port'\'' in undefined`
+- 本地浏览器能看到二维码；扫码后如需验证码，页面会出现输入框；提交成功后日志继续出现 `login` / `ready`
 - Bridge 继续进入 scan/二维码流程，而不是只启动几秒
 
 ## 生产部署（Docker Compose + MySQL）
@@ -186,11 +212,13 @@ curl -f http://127.0.0.1:8000/health
 2. 配置 FastAPI 的 `LLM_*`、`AI_BRIDGE_TOKEN`
 3. 配置 Bridge 的 `WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY`
 4. 启动 FastAPI 与 `wechaty-bridge`
-5. 确认 Bridge 日志未出现两类 resolver 异常，且已进入 scan/二维码流程
-6. 用独立测试企微员工账号扫码登录
-7. 普通微信外部联系人发送文本消息
-8. 确认客户收到 AI 回复
-9. 再发送“我刚才问了什么”，验证基础多轮上下文
+5. 通过 SSH 隧道或服务器本机浏览器打开 `http://127.0.0.1:${BRIDGE_WEB_PORT:-18080}/`
+6. 确认 Bridge 日志未出现两类 resolver 异常，且页面已显示二维码
+7. 用独立测试企微员工账号扫码登录；如页面提示验证码，则在页面输入并提交，不要把验证码贴到日志、聊天或仓库
+8. 等待日志出现 `login` / `ready`
+9. 普通微信外部联系人发送文本消息
+10. 确认客户收到 AI 回复
+11. 再发送“我刚才问了什么”，验证基础多轮上下文
 
 ## GitHub Actions 配置
 
