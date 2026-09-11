@@ -154,6 +154,8 @@ docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 docker compose --profile workpro logs -f wechaty-bridge
 ```
 
+> 上述命令主要用于本地或手动排障。生产环境的 main 分支 CD 现已自动构建、推送并部署 app 与 `wechaty-bridge` 镜像；服务器不再需要手动同步 `bridge/`、手动 `docker compose build` 或手动重启 Bridge。
+
 推荐先建立 SSH 隧道，再在本地浏览器打开控制台：
 
 ```bash
@@ -173,7 +175,7 @@ http://127.0.0.1:18080/
 ```bash
 docker compose --profile workpro stop wechaty-bridge || true
 docker compose --profile workpro rm -f wechaty-bridge || true
-# 同步最新 main 的 bridge/ 目录
+# 仅在本地源码排障时才需要重新 build；生产 CD 已改为直接拉取 GHCR Bridge 镜像
 docker compose --profile workpro build --no-cache --pull wechaty-bridge
 docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 ```
@@ -199,14 +201,43 @@ docker compose --profile workpro run --rm --entrypoint sh wechaty-bridge -lc \
 
 ```bash
 cp .env.example .env
-# 填写真实密码/密钥
+# 填写真实密码/密钥；APP_IMAGE / BRIDGE_IMAGE 由 CD 自动维护
 docker compose pull app migrate
+docker compose pull mysql redis
 docker compose --profile ops run --rm migrate
-docker compose up -d app mysql redis
+docker compose up -d --no-build app mysql redis
 curl -f http://127.0.0.1:8000/health
 ```
 
 详见 [`docs/deployment.md`](docs/deployment.md)。
+
+### main 分支 CD 自动交付
+
+- CD 会同时构建并推送：
+  - `ghcr.io/<owner>/wecom-ai-customer-service:sha-<commit>` / `:latest`
+  - `ghcr.io/<owner>/wecom-ai-customer-service-bridge:sha-<commit>` / `:latest`
+- CD 会原子更新服务器 `.env` 中的 `APP_IMAGE` 与 `BRIDGE_IMAGE`，保留其他 secrets 不变。
+- 服务器只需维护真实配置，不再需要手动同步 `bridge/` 源码或执行 `docker compose build`。
+- `DEPLOY_WORKPRO=true` 时，CD 会额外拉取并以 `--no-build --force-recreate --no-deps` 更新 `wechaty-bridge`；未启用时会清晰记录 `WorkPro disabled`，仍继续部署 app。
+- `DEPLOY_WORKPRO=true` 时请确保服务器 `.env` 至少已配置：`WECHATY_PUPPET_SERVICE_TOKEN`、`AI_BRIDGE_TOKEN`、`BRIDGE_WEB_TOKEN`。这些值不会打印到 GitHub Actions 日志。
+
+CD 后可在服务器验证：
+
+```bash
+cd /opt/wecom-ai-customer-service
+docker compose ps
+docker compose --profile workpro ps
+curl -f http://127.0.0.1:8000/health
+curl -f http://127.0.0.1:18080/health
+```
+
+通过 SSH 隧道访问 Bridge Web 控制台：
+
+```bash
+ssh -L 18080:127.0.0.1:18080 TonyAdmin@服务器
+```
+
+然后在本地浏览器打开 `http://127.0.0.1:18080/`。默认仅绑定服务器 `127.0.0.1`，**不要直接暴露到公网**。Bridge 重启后可能需要重新扫码或输入验证码；首次登录建议不要后台隐藏日志，先观察 `docker compose --profile workpro logs -f wechaty-bridge`。
 
 ## 最小验收流程
 

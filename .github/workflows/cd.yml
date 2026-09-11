@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/wecom-ai-customer-service
+      BRIDGE_IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/wecom-ai-customer-service-bridge
     steps:
       - uses: actions/checkout@v4
 
@@ -37,6 +38,22 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - id: bridge_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.BRIDGE_IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./bridge
+          file: ./bridge/Dockerfile
+          push: true
+          tags: ${{ steps.bridge_meta.outputs.tags }}
+          labels: ${{ steps.bridge_meta.outputs.labels }}
 
       # 服务器使用 SSH 密码登录：密码通过 SSHPASS 环境变量传给 sshpass -e，
       # 不写入命令行参数，也不打印到日志。
@@ -67,14 +84,41 @@ jobs:
           SERVER_USER: ${{ secrets.SERVER_USER }}
           SERVER_SSH_PORT: ${{ vars.SERVER_SSH_PORT || '22' }}
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          IMAGE_REF: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          APP_IMAGE_REF: ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          BRIDGE_IMAGE_REF: ${{ env.BRIDGE_IMAGE_NAME }}:sha-${{ github.sha }}
         run: |
-          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh -s -- "$DEPLOY_PATH" "$IMAGE_REF" <<'EOF'
+          sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o PubkeyAuthentication=no -o PreferredAuthentications=password -p "$SERVER_SSH_PORT" "$SERVER_USER@$SERVER_HOST" /bin/sh -s -- "$DEPLOY_PATH" "$APP_IMAGE_REF" "$BRIDGE_IMAGE_REF" <<'EOF'
           set -eu
           DEPLOY_PATH=$1
-          IMAGE_REF=$2
+          APP_IMAGE_REF=$2
+          BRIDGE_IMAGE_REF=$3
           mkdir -p "$DEPLOY_PATH"
           cd "$DEPLOY_PATH"
+          env_value() {
+            key=$1
+            awk -F= -v key="$key" '
+              $0 ~ "^[[:space:]]*" key "=" {
+                value = substr($0, index($0, "=") + 1)
+              }
+              END {
+                print value
+              }
+            ' .env
+          }
+          is_true() {
+            case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
+              1|true|yes|on) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          require_env_key() {
+            key=$1
+            value=$(env_value "$key")
+            if [ -z "$value" ]; then
+              echo "Missing required ${key} entry in $DEPLOY_PATH/.env" >&2
+              exit 1
+            fi
+          }
           if [ ! -f .env ]; then
             echo "Missing required $DEPLOY_PATH/.env" >&2
             exit 1
@@ -87,14 +131,14 @@ jobs:
           done
           tmp_env=$(mktemp .env.XXXXXX)
           trap 'rm -f "$tmp_env"' EXIT
-          awk -v image="$IMAGE_REF" '
-            BEGIN { updated = 0 }
-            /^APP_IMAGE=/ { print "APP_IMAGE=" image; updated = 1; next }
+          awk -v app_image="$APP_IMAGE_REF" -v bridge_image="$BRIDGE_IMAGE_REF" '
+            BEGIN { app_updated = 0; bridge_updated = 0 }
+            /^APP_IMAGE=/ { print "APP_IMAGE=" app_image; app_updated = 1; next }
+            /^BRIDGE_IMAGE=/ { print "BRIDGE_IMAGE=" bridge_image; bridge_updated = 1; next }
             { print }
             END {
-              if (!updated) {
-                print "APP_IMAGE=" image
-              }
+              if (!app_updated) print "APP_IMAGE=" app_image
+              if (!bridge_updated) print "BRIDGE_IMAGE=" bridge_image
             }
           ' .env > "$tmp_env"
           mv "$tmp_env" .env
@@ -102,11 +146,80 @@ jobs:
           if [ -n "$CURRENT_APP_ID" ]; then
             docker inspect --format='{{.Config.Image}}' "$CURRENT_APP_ID" > .previous_app_image || true
           fi
-          docker compose pull app migrate
-          docker compose --profile ops run --rm migrate
-          docker compose up -d app mysql redis
-          APP_PORT_VALUE=$(awk -F= '/^APP_PORT=/{print substr($0, index($0, "=") + 1); found=1; exit} END { if (!found) print "8000" }' .env)
+          CURRENT_BRIDGE_ID=$(docker compose --profile workpro ps -q wechaty-bridge || true)
+          if [ -n "$CURRENT_BRIDGE_ID" ]; then
+            docker inspect --format='{{.Config.Image}}' "$CURRENT_BRIDGE_ID" > .previous_bridge_image || true
+          fi
+          DEPLOY_WORKPRO_VALUE=$(env_value DEPLOY_WORKPRO)
+          if is_true "$DEPLOY_WORKPRO_VALUE"; then
+            DEPLOY_WORKPRO_ENABLED=true
+            echo "WorkPro deploy enabled"
+            require_env_key WECHATY_PUPPET_SERVICE_TOKEN
+            require_env_key AI_BRIDGE_TOKEN
+            require_env_key BRIDGE_WEB_TOKEN
+            APP_IMAGE="$APP_IMAGE_REF" BRIDGE_IMAGE="$BRIDGE_IMAGE_REF" docker compose --profile workpro pull app migrate wechaty-bridge
+          else
+            DEPLOY_WORKPRO_ENABLED=false
+            echo "WorkPro disabled"
+            APP_IMAGE="$APP_IMAGE_REF" docker compose pull app migrate
+          fi
+          docker compose pull mysql redis
+          APP_IMAGE="$APP_IMAGE_REF" docker compose --profile ops run --rm migrate
+          APP_IMAGE="$APP_IMAGE_REF" docker compose up -d --no-build app mysql redis
+          APP_PORT_VALUE=$(env_value APP_PORT)
+          if [ -z "$APP_PORT_VALUE" ]; then
+            APP_PORT_VALUE=8000
+          fi
           sleep 10
-          curl -fsS "http://127.0.0.1:$APP_PORT_VALUE/health"
-          printf '%s\n' "$IMAGE_REF" > .current_app_image
+          curl -fsS "http://127.0.0.1:$APP_PORT_VALUE/health" > /dev/null
+          docker compose ps
+          printf '%s\n' "$APP_IMAGE_REF" > .current_app_image
+          if [ "$DEPLOY_WORKPRO_ENABLED" = true ]; then
+            APP_CONTAINER_ID=$(docker compose ps -q app || true)
+            if [ -z "$APP_CONTAINER_ID" ]; then
+              echo "app container missing before bridge deploy" >&2
+              docker compose ps
+              exit 1
+            fi
+            if [ "$(docker inspect --format='{{.State.Running}}' "$APP_CONTAINER_ID")" != "true" ]; then
+              echo "app is not running before bridge deploy" >&2
+              docker compose ps
+              exit 1
+            fi
+            APP_IMAGE="$APP_IMAGE_REF" BRIDGE_IMAGE="$BRIDGE_IMAGE_REF" docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge
+            BRIDGE_PORT_VALUE=$(env_value BRIDGE_WEB_PORT)
+            if [ -z "$BRIDGE_PORT_VALUE" ]; then
+              BRIDGE_PORT_VALUE=18080
+            fi
+            bridge_attempts=0
+            while :; do
+              BRIDGE_ID=$(docker compose --profile workpro ps -q wechaty-bridge || true)
+              if [ -z "$BRIDGE_ID" ]; then
+                echo "wechaty-bridge container missing after deploy" >&2
+                docker compose --profile workpro ps
+                exit 1
+              fi
+              BRIDGE_STATE=$(docker inspect --format='{{if .State.Running}}{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}{{else}}stopped{{end}}' "$BRIDGE_ID")
+              if [ "$BRIDGE_STATE" = "healthy" ]; then
+                break
+              fi
+              if [ "$BRIDGE_STATE" = "unhealthy" ] || [ "$BRIDGE_STATE" = "stopped" ] || [ "$BRIDGE_STATE" = "exited" ]; then
+                echo "wechaty-bridge failed health check with state: $BRIDGE_STATE" >&2
+                docker compose --profile workpro ps
+                docker compose --profile workpro logs --tail=120 wechaty-bridge
+                exit 1
+              fi
+              bridge_attempts=$((bridge_attempts + 1))
+              if [ "$bridge_attempts" -ge 24 ]; then
+                echo "Timed out waiting for wechaty-bridge health" >&2
+                docker compose --profile workpro ps
+                docker compose --profile workpro logs --tail=120 wechaty-bridge
+                exit 1
+              fi
+              sleep 5
+            done
+            curl -fsS "http://127.0.0.1:$BRIDGE_PORT_VALUE/health" > /dev/null
+            printf '%s\n' "$BRIDGE_IMAGE_REF" > .current_bridge_image
+            docker compose --profile workpro ps
+          fi
           EOF
