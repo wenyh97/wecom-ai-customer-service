@@ -1,4 +1,4 @@
-import '@juzi/wechaty-puppet-service'
+import './grpc-resolver-compat'
 
 import qrcodeTerminal from 'qrcode-terminal'
 import { ScanStatus, WechatyBuilder, log, types, type Contact, type Message, type Wechaty } from '@juzi/wechaty'

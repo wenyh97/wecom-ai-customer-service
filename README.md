@@ -24,7 +24,8 @@
 - Bridge 运行时固定使用：
   - `@juzi/wechaty`
   - `@juzi/wechaty-puppet-service`
-  - `@grpc/grpc-js@1.13.5`（与 `wechaty-token@1.1.2` resolver listener API 兼容，且包含已知崩溃漏洞修复）
+  - `@grpc/grpc-js@1.13.5`
+  - `wechaty-token@1.1.2` + 仓库内 `bridge/src/grpc-resolver-compat.ts` 兼容层：把 token discovery 返回的 `{host, port}` 包装成 `grpc-js@1.13.5` 需要的 endpoint list，并在 discovery 返回空/非法地址时走 `onError`
   - `puppet: '@juzi/wechaty-puppet-service'`
   - `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`
 - Bridge 安全策略：
@@ -129,6 +130,7 @@ npm run dev
 ```
 
 - 必须使用 lockfile 安装（`npm ci`），不要跳过或改用 `npm install` 直接在线解析新版本。
+- 本次二阶段 resolver 根因不是 callback 是否存在，而是 `wechaty-token` 旧 resolver 把 `TcpSubchannelAddress[]` 直接传给了 `grpc-js@1.13.5` 已切换到 endpoint-list 语义的 `onSuccessfulResolution(...)`。验收标准必须是 **不再出现 `ERR_INVALID_ARG_TYPE` / `Cannot use 'in' operator to search for 'port' in undefined`，并继续进入 scan/二维码流程**。
 
 ### Compose 启动 Bridge
 
@@ -146,10 +148,24 @@ docker compose --profile workpro stop wechaty-bridge || true
 docker compose --profile workpro rm -f wechaty-bridge || true
 # 同步最新 main 的 bridge/ 目录
 docker compose --profile workpro build --no-cache --pull wechaty-bridge
-docker compose --profile workpro up wechaty-bridge
+docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 ```
 
-预期不再出现 `ERR_INVALID_ARG_TYPE` resolver callback 异常，随后进入 scan/二维码流程。
+重建后先验证镜像内运行时状态，再看启动日志：
+
+```bash
+docker compose --profile workpro run --rm --entrypoint sh wechaty-bridge -lc \
+  'node -v && npm ls @grpc/grpc-js wechaty-token --depth=0 && test -f dist/src/grpc-resolver-compat.js'
+```
+
+预期：
+
+- Node 为 `22.x`
+- `@grpc/grpc-js` 为 `1.13.5`
+- `wechaty-token` 为 `1.1.2`
+- 兼容层已编译进镜像
+- 启动日志不再出现 `ERR_INVALID_ARG_TYPE` 或 `Cannot use '\''in'\'' operator to search for '\''port'\'' in undefined`
+- Bridge 继续进入 scan/二维码流程，而不是只启动几秒
 
 ## 生产部署（Docker Compose + MySQL）
 
@@ -170,10 +186,11 @@ curl -f http://127.0.0.1:8000/health
 2. 配置 FastAPI 的 `LLM_*`、`AI_BRIDGE_TOKEN`
 3. 配置 Bridge 的 `WECHATY_PUPPET_SERVICE_TOKEN`、`WECHATY_PUPPET_SERVICE_AUTHORITY`
 4. 启动 FastAPI 与 `wechaty-bridge`
-5. 用独立测试企微员工账号扫码登录
-6. 普通微信外部联系人发送文本消息
-7. 确认客户收到 AI 回复
-8. 再发送“我刚才问了什么”，验证基础多轮上下文
+5. 确认 Bridge 日志未出现两类 resolver 异常，且已进入 scan/二维码流程
+6. 用独立测试企微员工账号扫码登录
+7. 普通微信外部联系人发送文本消息
+8. 确认客户收到 AI 回复
+9. 再发送“我刚才问了什么”，验证基础多轮上下文
 
 ## GitHub Actions 配置
 

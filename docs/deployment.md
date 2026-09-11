@@ -42,7 +42,7 @@ docker compose --profile workpro up -d wechaty-bridge
 docker compose --profile workpro logs -f wechaty-bridge
 ```
 
-> Bridge 运行时仅支持 Node `20.x/22.x` LTS；仓库中 `bridge/Dockerfile` 固定 `node:22-bookworm-slim`，依赖必须通过 `bridge/package-lock.json` + `npm ci` 安装，避免在线解析到不兼容的 gRPC resolver 版本。
+> Bridge 运行时仅支持 Node `20.x/22.x` LTS；仓库中 `bridge/Dockerfile` 固定 `node:22-bookworm-slim`，依赖必须通过 `bridge/package-lock.json` + `npm ci` 安装。当前审计策略为固定 `@grpc/grpc-js@1.13.5`，并在仓库内用 `bridge/src/grpc-resolver-compat.ts` 把 `wechaty-token@1.1.2` 的旧 `{host, port}` resolver 结果包装成 endpoint-list 形状。
 
 > JuziBot 试用环境建议保留 `WECHATY_PUPPET_SERVICE_AUTHORITY=token-service-discovery-test.juzibot.com`；试用 token 同时只允许登录一个企业微信账号，退出后可切换账号。默认不要关闭 TLS。收费与配额以服务商公告为准，不在应用代码中硬编码。
 
@@ -116,10 +116,25 @@ cd /opt/wecom-ai-customer-service
 docker compose --profile workpro stop wechaty-bridge || true
 docker compose --profile workpro rm -f wechaty-bridge || true
 docker compose --profile workpro build --no-cache --pull wechaty-bridge
-docker compose --profile workpro up wechaty-bridge
+docker compose --profile workpro up --no-build --no-deps wechaty-bridge
 ```
 
-预期 Bridge 不再出现 `ERR_INVALID_ARG_TYPE` resolver callback 异常，并继续进入扫码/二维码登录流程。
+二阶段 resolver 问题的实际根因：`wechaty-token@1.1.2` 仍按旧 listener 约定把 `TcpSubchannelAddress[]` 直接传给 `onSuccessfulResolution(...)`，而 `grpc-js@1.13.5` 的 load balancer 已按 endpoint-list 读取，最终会在 `'port' in undefined` 处崩溃。仅验证 callback 存在不足以验收，必须做无缓存重建并检查镜像内状态：
+
+```bash
+docker compose --profile workpro run --rm --entrypoint sh wechaty-bridge -lc \
+  'node -v && npm ls @grpc/grpc-js wechaty-token --depth=0 && test -f dist/src/grpc-resolver-compat.js'
+```
+
+发布验收标准：
+
+- 镜像内 Node 为 `22.x`
+- 镜像内 `@grpc/grpc-js` 为 `1.13.5`
+- 镜像内 `wechaty-token` 为 `1.1.2`
+- 镜像内存在编译后的 `dist/src/grpc-resolver-compat.js`
+- Bridge 日志不再出现 `ERR_INVALID_ARG_TYPE`
+- Bridge 日志不再出现 `Cannot use 'in' operator to search for 'port' in undefined`
+- Bridge 成功进入 scan/二维码流程；这比“进程启动数秒未退出”更重要
 
 ## 6. 日志与健康检查
 
