@@ -175,6 +175,17 @@ jobs:
           docker compose ps
           printf '%s\n' "$APP_IMAGE_REF" > .current_app_image
           if [ "$DEPLOY_WORKPRO_ENABLED" = true ]; then
+            APP_CONTAINER_ID=$(docker compose ps -q app || true)
+            if [ -z "$APP_CONTAINER_ID" ]; then
+              echo "app container missing before bridge deploy" >&2
+              docker compose ps
+              exit 1
+            fi
+            if [ "$(docker inspect --format='{{.State.Running}}' "$APP_CONTAINER_ID")" != "true" ]; then
+              echo "app is not running before bridge deploy" >&2
+              docker compose ps
+              exit 1
+            fi
             docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge
             BRIDGE_PORT_VALUE=$(env_value BRIDGE_WEB_PORT)
             if [ -z "$BRIDGE_PORT_VALUE" ]; then
