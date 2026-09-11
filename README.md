@@ -125,8 +125,8 @@ WORKPRO_STAFF_USERID=
 
 - 当前 JuziBot 试用 discovery 返回的 `101.126.67.87:4001` 为明文 gRPC 端口，生产运行需显式设置 `WECHATY_PUPPET_SERVICE_NO_TLS_INSECURE_CLIENT=true`；本仓库不会替你在代码中偷偷改掉该行为。
 - Web 控制台默认地址为 `http://127.0.0.1:18080/`（本地直接运行时）；验证码输入只通过受保护的 `POST /api/verify-code` 提交，不会拼接到 URL。
-- Web 控制台现已提供米白风格的「麻花 AI 营销工作台」Demo：登录页用户名固定为 `admin`，密码校验沿用运行时 `BRIDGE_WEB_TOKEN`（通过 `/api/session` 建立会话），不在前端硬编码密码。
-- 「内容资产 / 工具 / AI 知识库（RAG） / 数据统计 / 管理」均为静态前端 Demo 交互，不调用后端业务接口、不承诺持久化；二维码、扫码状态与验证码提交仍走现有 Bridge 控制接口。
+- Web 控制台提供「企微智能助手管理后台」：登录页用户名固定为 `admin`，密码校验沿用运行时 `BRIDGE_WEB_TOKEN`（通过 `/api/session` 建立会话），不在前端硬编码密码。
+- 后台聚焦企业微信接入管理，侧边栏实时展示当前登录状态与账号；二维码、扫码状态和验证码提交均走现有 Bridge 控制接口。
 - 试用 token、真实 LLM key、`AI_BRIDGE_TOKEN` 都不能提交。
 
 ### 本地启动 Bridge

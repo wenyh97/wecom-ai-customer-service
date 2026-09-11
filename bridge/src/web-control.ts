@@ -228,420 +228,746 @@ function renderPage (tokenRequired: boolean): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>麻花 AI 营销工作台（Demo）</title>
+  <title>企微智能助手管理后台</title>
   <style>
     :root {
-      --bg: #f4eee5;
-      --panel: #fbf7f1;
-      --card: #fffdf9;
-      --text: #1e1b18;
-      --muted: #6d6257;
-      --line: #e0d7cc;
-      --accent: #9c4c39;
-      --accent-soft: #eed8d1;
-      --success: #266c52;
-      --danger: #9f2a2a;
-      --radius-lg: 18px;
-      --radius-md: 12px;
-      --radius-sm: 10px;
-      --shadow: 0 8px 24px rgba(46, 35, 27, 0.08);
-      --space-1: 8px;
-      --space-2: 12px;
-      --space-3: 16px;
-      --space-4: 20px;
-      --space-5: 24px;
-      --space-6: 32px;
+      --bg: #eef2f7;
+      --surface: #ffffff;
+      --surface-soft: #f7f9fc;
+      --sidebar: #0c192b;
+      --sidebar-soft: #15253a;
+      --text: #172033;
+      --muted: #667085;
+      --line: #e4e9f0;
+      --accent: #07a957;
+      --accent-hover: #078f4b;
+      --accent-soft: #eaf9f1;
+      --warning: #d97706;
+      --warning-soft: #fff7e8;
+      --danger: #d92d20;
+      --danger-soft: #fff0ee;
+      --shadow: 0 22px 60px rgba(21, 34, 50, 0.12);
+      --shadow-card: 0 8px 30px rgba(27, 39, 55, 0.06);
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); }
+    html { min-width: 320px; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 8% 0%, rgba(7, 169, 87, 0.09), transparent 28rem),
+        var(--bg);
+      font-family: "PingFang SC", "Microsoft YaHei", Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
     button, input { font: inherit; }
-    button:focus-visible, input:focus-visible, .nav-btn:focus-visible, .tab-btn:focus-visible {
-      box-shadow: 0 0 0 3px rgba(156, 76, 57, 0.25);
+    button:focus-visible, input:focus-visible {
+      outline: 0;
+      box-shadow: 0 0 0 4px rgba(7, 169, 87, 0.16);
     }
     .hidden { display: none !important; }
-    .demo-tag { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--muted); background: #fff; }
-    .page-shell { min-height: 100vh; padding: var(--space-4); }
-
-    .login-wrap { max-width: 480px; margin: 48px auto; }
-    .login-card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      padding: var(--space-6);
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
-    .login-title { margin: 0 0 var(--space-2); font-size: 34px; letter-spacing: 0.5px; }
+    .page-shell { min-height: 100vh; padding: 24px; }
     .muted { color: var(--muted); }
-    .login-form { display: grid; gap: var(--space-3); margin-top: var(--space-5); }
-    .field { display: grid; gap: 8px; }
-    .field label { font-size: 14px; color: var(--muted); }
+    .eyebrow {
+      margin: 0 0 9px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+    }
+
+    .brand-mark {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      width: 58px;
+      height: 58px;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 18px;
+      color: #fff;
+      background: linear-gradient(145deg, #14ce71, #06964c);
+      box-shadow: 0 12px 28px rgba(7, 169, 87, 0.25);
+    }
+    .brand-mark svg {
+      width: 31px;
+      height: 31px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.7;
+    }
+    .brand-mark.small {
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      box-shadow: 0 8px 20px rgba(7, 169, 87, 0.2);
+    }
+    .brand-mark.small svg { width: 24px; height: 24px; }
+
+    .login-wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1.08fr) minmax(400px, 0.92fr);
+      width: min(1040px, 100%);
+      min-height: min(650px, calc(100vh - 48px));
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 28px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .login-brand-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      overflow: hidden;
+      padding: 64px;
+      color: #fff;
+      background:
+        radial-gradient(circle at 82% 18%, rgba(35, 224, 133, 0.23), transparent 16rem),
+        linear-gradient(145deg, #0d1c31, #102943);
+    }
+    .login-brand-panel::before,
+    .login-brand-panel::after {
+      position: absolute;
+      content: "";
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 50%;
+    }
+    .login-brand-panel::before { width: 360px; height: 360px; top: -180px; right: -130px; }
+    .login-brand-panel::after { width: 280px; height: 280px; bottom: -170px; left: -110px; }
+    .login-brand-panel > div { position: relative; z-index: 1; }
+    .login-brand-panel .brand-mark { margin-bottom: 38px; }
+    .login-brand-panel .eyebrow { color: #61e5a5; }
+    .login-brand-panel h1 {
+      margin: 0 0 18px;
+      font-size: clamp(36px, 4vw, 48px);
+      line-height: 1.18;
+      letter-spacing: -0.04em;
+    }
+    .login-brand-panel > div > p:last-child {
+      max-width: 390px;
+      margin: 0;
+      color: #aebdd0;
+      font-size: 16px;
+      line-height: 1.8;
+    }
+    .login-feature-list {
+      display: grid;
+      gap: 14px;
+      margin-top: 58px;
+      color: #dbe5ef;
+      font-size: 14px;
+    }
+    .login-feature-list span { display: flex; align-items: center; gap: 12px; }
+    .login-feature-list i {
+      display: grid;
+      width: 29px;
+      height: 29px;
+      place-items: center;
+      border: 1px solid rgba(97, 229, 165, 0.24);
+      border-radius: 9px;
+      color: #61e5a5;
+      font-size: 10px;
+      font-style: normal;
+    }
+    .login-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 64px;
+      background: var(--surface);
+    }
+    .login-kicker {
+      align-self: flex-start;
+      margin-bottom: 18px;
+      padding: 6px 10px;
+      border-radius: 7px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .login-title {
+      margin: 0 0 10px;
+      font-size: 32px;
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+    }
+    .login-card > .muted { margin: 0; font-size: 14px; }
+    .login-form { display: grid; gap: 20px; margin-top: 36px; }
+    .field { display: grid; gap: 9px; }
+    .field label { color: #344054; font-size: 13px; font-weight: 600; }
     .input {
-      width: 100%; border: 1px solid var(--line); border-radius: var(--radius-sm);
-      padding: 11px 12px; background: #fff;
+      width: 100%;
+      height: 48px;
+      padding: 0 14px;
+      border: 1px solid #d7dde6;
+      border-radius: 10px;
+      color: var(--text);
+      background: #fff;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
+    .input:hover { border-color: #b8c2cf; }
+    .input:focus { border-color: var(--accent); outline: 0; }
+    .input[readonly] { color: #667085; background: #f6f8fa; }
+    .input::placeholder { color: #98a2b3; }
     .btn {
-      border: 1px solid transparent; border-radius: var(--radius-sm); padding: 10px 14px;
-      background: var(--accent); color: #fff; cursor: pointer;
+      display: inline-flex;
+      min-height: 42px;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 0 18px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      color: #fff;
+      background: var(--accent);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
     }
-    .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
-    .btn-secondary { background: #fff; color: var(--text); border-color: var(--line); }
-    .error { color: var(--danger); margin: 0; }
-    .success { color: var(--success); margin: 0; }
+    .btn:hover { background: var(--accent-hover); }
+    .btn:active { transform: translateY(1px); }
+    .btn[disabled] { opacity: 0.58; cursor: not-allowed; }
+    .btn-secondary {
+      min-height: 40px;
+      color: #344054;
+      background: #fff;
+      border-color: var(--line);
+      font-size: 13px;
+    }
+    .btn-secondary:hover { border-color: #cbd3dd; background: #f9fafb; }
+    .login-submit { height: 50px; margin-top: 4px; }
+    .login-submit span { font-size: 19px; font-weight: 400; }
+    .login-hint {
+      margin: 28px 0 0;
+      color: #98a2b3;
+      font-size: 12px;
+      line-height: 1.6;
+      text-align: center;
+    }
+    .form-message { margin: 14px 0 0; font-size: 13px; }
+    .error { color: var(--danger); }
+    .success { color: var(--accent); }
 
     .app {
       display: grid;
-      grid-template-columns: 244px minmax(0, 1fr);
-      gap: var(--space-4);
-      min-height: calc(100vh - var(--space-4) * 2);
+      grid-template-columns: 276px minmax(0, 1fr);
+      width: min(1500px, 100%);
+      min-height: calc(100vh - 48px);
+      margin: 0 auto;
+      overflow: hidden;
+      border-radius: 24px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
     }
     .sidebar {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      padding: var(--space-4);
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
+      min-width: 0;
+      padding: 30px 24px;
+      color: #fff;
+      background:
+        radial-gradient(circle at 18% 90%, rgba(7, 169, 87, 0.12), transparent 16rem),
+        var(--sidebar);
     }
-    .brand h1 { margin: 0; font-size: 22px; }
-    .brand p { margin: 6px 0 0; color: var(--muted); }
-    .nav { display: grid; gap: 8px; }
-    .nav-btn {
-      border: 1px solid transparent;
-      border-radius: var(--radius-sm);
-      background: transparent;
-      color: var(--text);
-      text-align: left;
-      padding: 10px 12px;
-      cursor: pointer;
+    .brand { display: flex; align-items: center; gap: 13px; }
+    .brand h1 { margin: 0; font-size: 16px; letter-spacing: -0.01em; }
+    .brand p { margin: 5px 0 0; color: #8191a6; font-size: 12px; }
+    .sidebar-section { margin-top: 54px; }
+    .sidebar-label {
+      margin: 0 0 12px;
+      color: #718299;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+    }
+    .status-overview {
+      padding: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+    .status-heading { display: flex; align-items: center; gap: 10px; }
+    .status-heading strong { font-size: 15px; }
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 auto;
+      border: 2px solid transparent;
+      border-radius: 50%;
+      background: #8090a5;
+      box-shadow: 0 0 0 4px rgba(128, 144, 165, 0.13);
+    }
+    .status-dot.success { background: #24d67b; box-shadow: 0 0 0 4px rgba(36, 214, 123, 0.14); }
+    .status-dot.warning { background: #f6ad45; box-shadow: 0 0 0 4px rgba(246, 173, 69, 0.14); }
+    .status-dot.danger { background: #f97066; box-shadow: 0 0 0 4px rgba(249, 112, 102, 0.14); }
+    .status-overview > p {
+      margin: 10px 0 0;
+      color: #8999ad;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .status-divider { height: 1px; margin: 18px 0; background: rgba(255, 255, 255, 0.08); }
+    .account-label { display: block; color: #718299; font-size: 11px; }
+    .account-name {
+      display: block;
+      overflow: hidden;
+      margin-top: 7px;
+      color: #dce5ef;
+      font-size: 13px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .sidebar-foot {
       display: flex;
-      align-items: center;
-      gap: 8px;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: auto;
+      padding: 18px;
+      border-radius: 13px;
+      color: #b7c3d1;
+      background: rgba(255, 255, 255, 0.04);
     }
-    .nav-btn.active { background: #fff; border-color: var(--line); color: var(--accent); font-weight: 600; }
-    .sidebar-foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: var(--space-3); font-size: 12px; color: var(--muted); }
+    .sidebar-foot .secure-icon {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      color: #0d2b20;
+      background: #4ad693;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .sidebar-foot strong { display: block; font-size: 12px; }
+    .sidebar-foot p { margin: 4px 0 0; color: #718299; font-size: 10px; line-height: 1.5; }
 
     .content {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
-      padding: var(--space-4);
-      display: grid;
-      grid-template-rows: auto 1fr;
-      gap: var(--space-4);
+      min-width: 0;
+      padding: 34px 38px 38px;
+      background: var(--surface-soft);
     }
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border-bottom: 1px solid var(--line); padding-bottom: var(--space-3); }
-    .topbar h2 { margin: 0; font-size: 28px; }
-    .top-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .status-pill { border-radius: 999px; background: #fff; border: 1px solid var(--line); padding: 6px 10px; font-size: 12px; }
-
-    .page { display: none; }
-    .page.active { display: block; }
-    .grid { display: grid; gap: var(--space-3); }
-    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .card {
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-md);
-      padding: var(--space-4);
-    }
-    .card h3 { margin: 0 0 8px; }
-    .card p { margin: 0; color: var(--muted); }
-    .section-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-3); }
-    .section-head h3 { margin: 0; }
-
-    .chat-box { min-height: 220px; max-height: 320px; overflow: auto; display: grid; gap: 8px; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; }
-    .chat-msg { padding: 8px 10px; border-radius: 10px; max-width: 88%; line-height: 1.5; }
-    .chat-msg.user { margin-left: auto; background: var(--accent-soft); }
-    .chat-msg.ai { background: #f4f0e8; }
-    .chat-compose { display: grid; grid-template-columns: 1fr auto; gap: var(--space-2); margin-top: var(--space-2); }
-    .quick-links { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); }
-    .quick-btn { width: 100%; text-align: left; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; padding: 10px; cursor: pointer; }
-
-    .bridge-qr { min-height: 220px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px dashed var(--line); border-radius: var(--radius-sm); margin-top: var(--space-2); }
-    .bridge-qr svg { width: min(100%, 280px); height: auto; }
-
-    .tool-btn { width: 100%; margin-top: var(--space-3); }
-
-    .modal-mask {
-      position: fixed;
-      inset: 0;
-      background: rgba(30, 27, 24, 0.35);
+    .topbar {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: var(--space-4);
-      z-index: 100;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 30px;
     }
-    .modal {
-      width: min(560px, 100%);
-      background: var(--card);
-      border-radius: var(--radius-lg);
+    .topbar h2 { margin: 0; font-size: 28px; letter-spacing: -0.035em; }
+    .page-subtitle { margin: 9px 0 0; color: var(--muted); font-size: 13px; }
+    .top-meta { display: flex; align-items: center; gap: 10px; }
+    .status-pill,
+    .phase-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       border: 1px solid var(--line);
-      box-shadow: var(--shadow);
-      padding: var(--space-5);
+      border-radius: 999px;
+      color: #667085;
+      background: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
     }
-    .modal h3 { margin-top: 0; }
-
-    .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .tag { border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; font-size: 12px; color: var(--muted); background: #fff; }
-
-    .tabs { display: flex; gap: 8px; }
-    .tab-btn { border: 1px solid var(--line); background: #fff; color: var(--text); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
-    .tab-btn.active { border-color: var(--accent); color: var(--accent); }
-
-    .chart { height: 120px; border-radius: var(--radius-sm); border: 1px solid var(--line); background: linear-gradient(to top, #f4ece3 0%, #f4ece3 22%, transparent 22%), #fff; position: relative; overflow: hidden; }
-    .chart svg { width: 100%; height: 100%; display: block; }
-
-    @media (max-width: 1024px) {
-      .grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .quick-links { grid-template-columns: 1fr 1fr; }
+    .status-pill { min-height: 40px; padding: 0 14px; }
+    .status-pill i,
+    .live-mark i {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #98a2b3;
     }
-    @media (max-width: 860px) {
-      .page-shell { padding: var(--space-2); }
-      .app { grid-template-columns: 1fr; }
-      .sidebar { gap: var(--space-3); }
-      .nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .nav-btn { font-size: 13px; padding: 8px; justify-content: center; text-align: center; }
-      .grid.two, .grid.three { grid-template-columns: 1fr; }
-      .quick-links { grid-template-columns: 1fr; }
-      .topbar { flex-direction: column; align-items: flex-start; }
-      .chat-compose { grid-template-columns: 1fr; }
+    .status-pill.success { color: #087443; border-color: #cceedd; background: #f4fcf8; }
+    .status-pill.success i { background: var(--accent); }
+    .status-pill.warning { color: #a45d09; border-color: #f3dfbb; background: #fffbf3; }
+    .status-pill.warning i { background: var(--warning); }
+    .status-pill.danger { color: #b42318; border-color: #f2cbc7; background: #fff7f6; }
+    .status-pill.danger i { background: var(--danger); }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(460px, 1.5fr) minmax(300px, 0.86fr);
+      gap: 22px;
+      align-items: start;
+    }
+    .connection-card,
+    .detail-card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--surface);
+      box-shadow: var(--shadow-card);
+    }
+    .connection-card { min-height: 590px; padding: 28px; }
+    .section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .section-kicker {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--accent);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+    .section-head h3 { margin: 0; font-size: 20px; letter-spacing: -0.025em; }
+    .phase-badge { padding: 6px 10px; }
+    .phase-badge.success { color: #087443; border-color: #cceedd; background: var(--accent-soft); }
+    .phase-badge.warning { color: #a45d09; border-color: #f1dab2; background: var(--warning-soft); }
+    .phase-badge.danger { color: #b42318; border-color: #f2cbc7; background: var(--danger-soft); }
+    .connection-message {
+      min-height: 22px;
+      margin: 13px 0 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .bridge-qr {
+      display: flex;
+      min-height: 390px;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 14px;
+      overflow: hidden;
+      padding: 30px;
+      border: 1px dashed #d9e0e9;
+      border-radius: 15px;
+      color: #98a2b3;
+      background:
+        linear-gradient(rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.8)),
+        repeating-linear-gradient(45deg, #f4f7fa 0, #f4f7fa 8px, #fff 8px, #fff 16px);
+      font-size: 12px;
+    }
+    .bridge-qr .qr-image { width: min(100%, 310px); height: auto; }
+    .empty-qr {
+      display: grid;
+      width: 68px;
+      height: 68px;
+      place-items: center;
+      border-radius: 18px;
+      color: #a5b0bd;
+      background: #edf1f5;
+    }
+    .empty-qr svg {
+      width: 32px;
+      height: 32px;
+      fill: none;
+      stroke: currentColor;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 1.5;
+    }
+    .verify-panel {
+      margin-top: 18px;
+      padding: 17px;
+      border: 1px solid #f2ddba;
+      border-radius: 13px;
+      background: var(--warning-soft);
+    }
+    .verify-copy { display: flex; align-items: flex-start; gap: 10px; }
+    .verify-copy p { margin: 1px 0 0; color: #875114; font-size: 12px; line-height: 1.6; }
+    .verify-icon {
+      display: grid;
+      width: 20px;
+      height: 20px;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      color: #fff;
+      background: var(--warning);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .verify-form { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-top: 13px; }
+    .verify-form .input { height: 42px; background: #fff; }
+
+    .detail-column { display: grid; gap: 18px; }
+    .detail-card { padding: 22px; }
+    .detail-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .detail-card h3 { margin: 0; font-size: 15px; }
+    .live-mark {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #98a2b3;
+      font-size: 10px;
+    }
+    .live-mark i { background: var(--accent); }
+    .detail-list { margin: 18px 0 0; }
+    .detail-list > div {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 0;
+      border-top: 1px solid #edf0f4;
+      font-size: 12px;
+    }
+    .detail-list dt { color: #98a2b3; }
+    .detail-list dd {
+      max-width: 65%;
+      margin: 0;
+      overflow-wrap: anywhere;
+      color: #344054;
+      font-weight: 600;
+      text-align: right;
+    }
+    .steps { display: grid; gap: 18px; margin: 22px 0 0; padding: 0; list-style: none; }
+    .steps li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; align-items: start; }
+    .steps li > span {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border-radius: 9px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .steps p { margin: 0; color: #98a2b3; font-size: 11px; line-height: 1.55; }
+    .steps strong { display: block; margin-bottom: 3px; color: #475467; font-size: 12px; }
+    .notice-card {
+      display: grid;
+      grid-template-columns: 25px 1fr;
+      gap: 11px;
+      padding: 18px;
+      border: 1px solid #dcebe4;
+      border-radius: 14px;
+      background: #f2faf6;
+    }
+    .notice-card > span {
+      display: grid;
+      width: 22px;
+      height: 22px;
+      place-items: center;
+      border: 1px solid #93d8b6;
+      border-radius: 50%;
+      color: #087443;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .notice-card p { margin: 0; color: #5b7468; font-size: 11px; line-height: 1.65; }
+    .notice-card strong { display: block; margin-bottom: 3px; color: #296147; font-size: 12px; }
+
+    @media (max-width: 1080px) {
+      .content-grid { grid-template-columns: 1fr; }
+      .detail-column { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .notice-card { grid-column: 1 / -1; }
+    }
+    @media (max-width: 820px) {
+      .page-shell { padding: 12px; }
+      .login-wrap { grid-template-columns: 1fr; min-height: calc(100vh - 24px); }
+      .login-brand-panel { display: none; }
+      .login-card { padding: 44px; }
+      .app { grid-template-columns: 1fr; min-height: calc(100vh - 24px); }
+      .sidebar { padding: 22px; }
+      .sidebar-section { margin-top: 28px; }
+      .status-overview { display: grid; grid-template-columns: 1fr auto; gap: 5px 20px; align-items: center; }
+      .status-overview > p { grid-column: 1; }
+      .status-divider { display: none; }
+      .account-label { grid-column: 2; grid-row: 1; text-align: right; }
+      .account-name { grid-column: 2; grid-row: 2; text-align: right; }
+      .sidebar-foot { display: none; }
+      .content { padding: 28px 22px; }
+    }
+    @media (max-width: 600px) {
+      .login-card { padding: 32px 24px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .top-meta { width: 100%; justify-content: space-between; }
+      .status-pill { padding: 0 11px; }
+      .connection-card { min-height: auto; padding: 20px; }
+      .section-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+      .bridge-qr { min-height: 310px; padding: 18px; }
+      .verify-form { grid-template-columns: 1fr; }
+      .detail-column { grid-template-columns: 1fr; }
+      .notice-card { grid-column: auto; }
     }
   </style>
 </head>
 <body>
   <main class="page-shell">
     <section id="login-screen" class="login-wrap">
+      <div class="login-brand-panel">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v8a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 3v-3h-2A2.5 2.5 0 0 1 3 14.5v-8A2.5 2.5 0 0 1 5.5 4Z"/><path d="M8 9h8M8 12.5h5"/></svg>
+        </span>
+        <div>
+          <p class="eyebrow">WECOM AI ASSISTANT</p>
+          <h1>企微智能助手</h1>
+          <p>集中查看企业微信接入状态，安全完成扫码与验证。</p>
+        </div>
+        <div class="login-feature-list" aria-label="控制台能力">
+          <span><i>01</i> 实时连接状态</span>
+          <span><i>02</i> 企业微信扫码登录</span>
+          <span><i>03</i> 安全验证码提交</span>
+        </div>
+      </div>
       <article class="login-card">
-        <span class="demo-tag">Demo 登录</span>
-        <h1 class="login-title">麻花 AI 营销工作台</h1>
-        <p class="muted">这是前端 Demo 登录页面，不代表真实多用户权限系统。用户名固定为 <strong>admin</strong>，密码校验沿用后端会话认证流程（BRIDGE_WEB_TOKEN）。</p>
+        <span class="login-kicker">管理后台</span>
+        <h2 class="login-title">欢迎回来</h2>
+        <p class="muted">请使用管理凭据登录控制台。</p>
         <form id="login-form" class="login-form">
           <div class="field">
-            <label for="login-username">用户名</label>
+            <label for="login-username">管理员账号</label>
             <input id="login-username" class="input" type="text" value="admin" readonly required>
           </div>
           <div class="field">
-            <label for="login-password">密码</label>
-            <input id="login-password" class="input" type="password" autocomplete="current-password" required>
+            <label for="login-password">访问密码</label>
+            <input id="login-password" class="input" type="password" autocomplete="current-password" placeholder="输入 BRIDGE_WEB_TOKEN" required>
           </div>
-          <button id="login-submit" class="btn" type="submit">登录工作台</button>
+          <button id="login-submit" class="btn login-submit" type="submit">
+            进入管理后台
+            <span aria-hidden="true">→</span>
+          </button>
         </form>
-        <p id="login-error" class="error hidden"></p>
+        <p id="login-error" class="form-message error hidden"></p>
+        <p class="login-hint">账号固定为 admin，访问密码由服务端安全校验。</p>
       </article>
     </section>
 
     <section id="app-screen" class="app hidden" aria-live="polite">
       <aside class="sidebar">
         <header class="brand">
-          <h1>麻花 AI</h1>
-          <p>营销工作台</p>
+          <span class="brand-mark small" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M5.5 4h13A2.5 2.5 0 0 1 21 6.5v8a2.5 2.5 0 0 1-2.5 2.5H12l-4.5 3v-3h-2A2.5 2.5 0 0 1 3 14.5v-8A2.5 2.5 0 0 1 5.5 4Z"/><path d="M8 9h8M8 12.5h5"/></svg>
+          </span>
+          <div>
+            <h1>企微智能助手</h1>
+            <p>管理后台</p>
+          </div>
         </header>
-        <nav class="nav" aria-label="工作台导航">
-          <button class="nav-btn active" data-nav="chat" type="button">💬 对话创作</button>
-          <button class="nav-btn" data-nav="assets" type="button">🗂️ 内容资产</button>
-          <button class="nav-btn" data-nav="tools" type="button">🧰 工具</button>
-          <button class="nav-btn" data-nav="rag" type="button">📚 AI 知识库（RAG）</button>
-          <button class="nav-btn" data-nav="stats" type="button">📊 数据统计</button>
-          <button class="nav-btn" data-nav="admin" type="button">⚙️ 管理</button>
-        </nav>
+
+        <div class="sidebar-section">
+          <p class="sidebar-label">当前登录状态</p>
+          <div class="status-overview">
+            <div class="status-heading">
+              <span id="sidebar-status-dot" class="status-dot neutral" aria-hidden="true"></span>
+              <strong id="sidebar-status-text">正在连接</strong>
+            </div>
+            <p id="sidebar-status-message">正在获取企业微信连接状态。</p>
+            <div class="status-divider"></div>
+            <span class="account-label">企业微信账号</span>
+            <strong id="sidebar-login-user" class="account-name">尚未登录</strong>
+          </div>
+        </div>
+
         <footer class="sidebar-foot">
-          Demo 环境 / 本地工作空间
+          <span class="secure-icon" aria-hidden="true">✓</span>
+          <div>
+            <strong>安全连接</strong>
+            <p>敏感凭据不会在页面展示</p>
+          </div>
         </footer>
       </aside>
 
       <section class="content">
         <header class="topbar">
           <div>
-            <h2 id="page-title">对话创作</h2>
-            <p class="muted" id="page-subtitle">静态 Demo 预览，后端能力逐步接入。</p>
+            <p class="eyebrow">CONNECTION MANAGEMENT</p>
+            <h2>企业微信接入</h2>
+            <p class="page-subtitle">查看并管理智能助手的企业微信登录连接。</p>
           </div>
           <div class="top-meta">
-            <span id="service-status" class="status-pill">服务状态：连接中</span>
-            <span class="status-pill">当前用户：admin</span>
-            <button id="logout-btn" type="button" class="btn btn-secondary">退出登录</button>
+            <span id="service-status" class="status-pill neutral"><i></i>Bridge 正在连接</span>
+            <button id="logout-btn" type="button" class="btn btn-secondary">退出后台</button>
           </div>
         </header>
 
-        <div>
-          <section id="page-chat" class="page active">
-            <div class="grid two">
-              <article class="card">
-                <div class="section-head">
-                  <h3>AI 对话创作（Demo）</h3>
-                  <span class="demo-tag">静态预览</span>
-                </div>
-                <p class="muted">欢迎回来，admin。你可以在这里预览营销话术创作流。</p>
-                <div id="chat-box" class="chat-box" aria-label="对话记录">
-                  <div class="chat-msg ai">你好，我是营销助手 Demo。可以先试试“秋季促销开场白”。</div>
-                </div>
-                <form id="chat-form" class="chat-compose">
-                  <input id="chat-input" class="input" type="text" placeholder="输入你的营销创作需求（仅本地 Demo 回复）" required>
-                  <button id="chat-send" class="btn" type="submit">发送</button>
-                </form>
-                <div class="quick-links" style="margin-top: 12px;">
-                  <button class="quick-btn" type="button" data-quick="写一条周末会员关怀文案">周末关怀</button>
-                  <button class="quick-btn" type="button" data-quick="生成新品发布朋友圈文案">新品发布</button>
-                  <button class="quick-btn" type="button" data-quick="客户沉默七天后如何唤醒">客户唤醒</button>
-                </div>
-              </article>
-
-              <article class="card">
-                <div class="section-head">
-                  <h3>连接状态（保留真实 Bridge 能力）</h3>
-                  <span class="status-pill" id="bridge-phase">starting</span>
-                </div>
-                <p id="bridge-message" class="muted">Bridge 正在启动，请稍候。</p>
-                <p class="muted">最近更新：<span id="bridge-updated-at">-</span></p>
-                <p class="muted">二维码状态：<span id="bridge-qr-status">-</span></p>
-                <p class="muted">当前登录：<span id="bridge-login-user">-</span></p>
-                <div id="bridge-qr" class="bridge-qr"><span class="muted">等待二维码...</span></div>
-                <div id="verify-wrap" class="hidden" style="margin-top: 12px;">
-                  <p id="verify-prompt" class="muted"></p>
-                  <form id="verify-form" class="chat-compose">
-                    <input id="verify-code" class="input" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="32" placeholder="输入验证码" required>
-                    <button id="verify-submit" class="btn" type="submit">提交验证码</button>
-                  </form>
-                  <p id="verify-feedback" class="hidden"></p>
-                </div>
-              </article>
+        <div class="content-grid">
+          <article class="connection-card">
+            <div class="section-head">
+              <div>
+                <span class="section-kicker">企业微信登录</span>
+                <h3 id="connection-title">等待企业微信连接</h3>
+              </div>
+              <span class="phase-badge neutral" id="bridge-phase">正在启动</span>
             </div>
-          </section>
+            <p id="bridge-message" class="connection-message">Bridge 正在启动，请稍候。</p>
 
-          <section id="page-assets" class="page">
-            <article class="card">
-              <div class="section-head">
-                <h3>内容资产库（Demo）</h3>
-                <span class="demo-tag">仅前端筛选</span>
+            <div id="bridge-qr" class="bridge-qr">
+              <div class="empty-qr" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 8h8v8H8z"/></svg>
               </div>
-              <input id="asset-search" class="input" type="search" placeholder="搜索模板或标签，如：节日 / FAQ">
-              <div id="asset-list" class="grid two" style="margin-top: 12px;">
-                <article class="card asset-item" data-title="欢迎语模板" data-tags="欢迎 新客 开场">
-                  <h3>欢迎语模板</h3>
-                  <p>用于首次触达新客户的标准开场。</p>
-                  <div class="tags"><span class="tag">欢迎</span><span class="tag">新客</span></div>
-                </article>
-                <article class="card asset-item" data-title="节日问候" data-tags="节日 关怀 活动">
-                  <h3>节日问候</h3>
-                  <p>中秋、国庆等节日场景模板集合。</p>
-                  <div class="tags"><span class="tag">节日</span><span class="tag">关怀</span></div>
-                </article>
-                <article class="card asset-item" data-title="产品介绍" data-tags="产品 卖点 话术">
-                  <h3>产品介绍</h3>
-                  <p>核心产品卖点与常见提问答复。</p>
-                  <div class="tags"><span class="tag">产品</span><span class="tag">卖点</span></div>
-                </article>
-                <article class="card asset-item" data-title="FAQ" data-tags="FAQ 问答 客服">
-                  <h3>FAQ</h3>
-                  <p>高频问题的统一回答示例。</p>
-                  <div class="tags"><span class="tag">FAQ</span><span class="tag">客服</span></div>
-                </article>
-              </div>
-            </article>
-          </section>
+              <span>二维码生成后将在这里显示</span>
+            </div>
 
-          <section id="page-tools" class="page">
-            <article class="card">
-              <div class="section-head">
-                <h3>工具（Demo）</h3>
-                <span class="demo-tag">后端能力即将接入</span>
+            <div id="verify-wrap" class="verify-panel hidden">
+              <div class="verify-copy">
+                <span class="verify-icon" aria-hidden="true">!</span>
+                <p id="verify-prompt">请在企业微信手机端查看验证码。</p>
               </div>
-              <div class="grid three">
-                <article class="card"><h3>👋 欢迎语</h3><p>根据客户标签生成开场语。</p><button class="btn btn-secondary tool-btn" data-tool="欢迎语" type="button">立即体验</button></article>
-                <article class="card"><h3>⏰ 定时推送</h3><p>设置节奏化客户触达任务。</p><button class="btn btn-secondary tool-btn" data-tool="定时推送" type="button">立即体验</button></article>
-                <article class="card"><h3>⚡ 快捷回复</h3><p>常见场景一键引用回复。</p><button class="btn btn-secondary tool-btn" data-tool="快捷回复" type="button">立即体验</button></article>
-                <article class="card"><h3>🧾 会话记录</h3><p>按客户查看沟通摘要 Demo。</p><button class="btn btn-secondary tool-btn" data-tool="会话记录" type="button">立即体验</button></article>
-                <article class="card"><h3>🧠 AI 客户画像分析</h3><p>聚类识别客户意向与偏好。</p><button class="btn btn-secondary tool-btn" data-tool="AI 客户画像分析" type="button">立即体验</button></article>
-                <article class="card"><h3>📈 AI 老客维护策略推荐</h3><p>提供复购与沉睡唤醒建议。</p><button class="btn btn-secondary tool-btn" data-tool="AI 老客维护策略推荐" type="button">立即体验</button></article>
-              </div>
-            </article>
-          </section>
-
-          <section id="page-rag" class="page">
-            <article class="card">
-              <div class="section-head">
-                <h3>AI 知识库（RAG）</h3>
-                <span class="demo-tag">静态指标 Demo</span>
-              </div>
-              <form id="rag-form" class="chat-compose" style="margin: 0 0 12px;">
-                <input id="rag-query" class="input" type="text" placeholder="输入检索关键词，例如：退换货政策">
-                <button id="rag-search" class="btn" type="submit">检索</button>
+              <form id="verify-form" class="verify-form">
+                <label class="sr-only" for="verify-code">企业微信验证码</label>
+                <input id="verify-code" class="input" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="32" placeholder="输入验证码" required>
+                <button id="verify-submit" class="btn" type="submit">提交验证</button>
               </form>
-              <div class="tabs" style="margin-bottom: 10px;">
-                <span class="status-pill">命中率：82%</span>
-                <span class="status-pill">覆盖率：74%</span>
-                <button id="rag-add" class="btn btn-secondary" type="button">添加文档</button>
-              </div>
-              <div class="grid two">
-                <article class="card"><h3>售后服务手册 v2</h3><p>标签：售后 / 退款 / 物流</p></article>
-                <article class="card"><h3>新品发布培训稿</h3><p>标签：产品 / 卖点 / 异议处理</p></article>
-                <article class="card"><h3>会员运营 SOP</h3><p>标签：老客 / 复购 / 关怀</p></article>
-                <article class="card"><h3>品牌语调规范</h3><p>标签：品牌 / 文案 / 口吻</p></article>
-              </div>
-              <p id="rag-feedback" class="muted" style="margin-top: 12px;">Demo 数据仅用于前端展示。</p>
-            </article>
-          </section>
+              <p id="verify-feedback" class="form-message hidden"></p>
+            </div>
+          </article>
 
-          <section id="page-stats" class="page">
-            <article class="card">
-              <div class="section-head">
-                <h3>数据统计（Demo）</h3>
-                <div class="tabs" aria-label="时间范围">
-                  <button class="tab-btn active" data-range="today" type="button">今日</button>
-                  <button class="tab-btn" data-range="7d" type="button">7天</button>
-                  <button class="tab-btn" data-range="30d" type="button">30天</button>
+          <div class="detail-column">
+            <article class="detail-card">
+              <div class="detail-card-head">
+                <h3>连接详情</h3>
+                <span class="live-mark"><i></i>实时更新</span>
+              </div>
+              <dl class="detail-list">
+                <div>
+                  <dt>当前账号</dt>
+                  <dd id="bridge-login-user">未登录</dd>
                 </div>
-              </div>
-              <div class="grid two">
-                <article class="card"><h3>会话数</h3><p id="metric-chat">1,280</p></article>
-                <article class="card"><h3>触达客户</h3><p id="metric-customers">436</p></article>
-                <article class="card"><h3>AI 回复率</h3><p id="metric-ai-rate">78%</p></article>
-                <article class="card"><h3>转人工率</h3><p id="metric-human-rate">12%</p></article>
-              </div>
-              <div class="chart" style="margin-top: 12px;">
-                <svg viewBox="0 0 600 120" preserveAspectRatio="none" aria-label="趋势图">
-                  <polyline fill="none" stroke="#9c4c39" stroke-width="3" points="0,92 80,75 160,70 240,58 320,62 400,46 480,40 560,28 600,33"></polyline>
-                </svg>
-              </div>
+                <div>
+                  <dt>二维码状态</dt>
+                  <dd id="bridge-qr-status">-</dd>
+                </div>
+                <div>
+                  <dt>最后更新</dt>
+                  <dd id="bridge-updated-at">-</dd>
+                </div>
+              </dl>
             </article>
-          </section>
 
-          <section id="page-admin" class="page">
-            <article class="card">
-              <div class="section-head">
-                <h3>管理（Demo）</h3>
-                <span class="demo-tag">仅内存状态</span>
-              </div>
-              <div class="grid two">
-                <article class="card"><h3>账号信息</h3><p>用户名：admin（Demo）</p></article>
-                <article class="card"><h3>Bridge 连接状态</h3><p id="admin-bridge-phase">starting</p></article>
-                <article class="card"><h3>Web 控制台状态</h3><p id="admin-web-status">运行中</p></article>
-                <article class="card">
-                  <h3>Demo 设置</h3>
-                  <label style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input id="theme-toggle" type="checkbox">暖色主题增强</label>
-                  <label style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input id="notify-toggle" type="checkbox" checked>接收通知提醒</label>
-                </article>
-              </div>
-              <p id="admin-feedback" class="muted" style="margin-top: 12px;">不会展示任何 Token 或密钥。</p>
+            <article class="detail-card guide-card">
+              <h3>登录指引</h3>
+              <ol class="steps">
+                <li><span>1</span><p><strong>打开企业微信</strong>使用测试员工账号进入扫码功能</p></li>
+                <li><span>2</span><p><strong>扫描登录二维码</strong>在手机端确认本次登录</p></li>
+                <li><span>3</span><p><strong>完成安全验证</strong>如有验证码，请在本页提交</p></li>
+              </ol>
             </article>
-          </section>
+
+            <article class="notice-card">
+              <span aria-hidden="true">i</span>
+              <p><strong>连接说明</strong>二维码与验证码仅用于建立 Bridge 会话，不会记录或展示访问令牌。</p>
+            </article>
+          </div>
         </div>
       </section>
     </section>
   </main>
-
-  <div id="tool-modal-mask" class="modal-mask hidden" role="dialog" aria-modal="true" aria-labelledby="tool-modal-title" aria-describedby="tool-modal-content">
-    <article class="modal">
-      <h3 id="tool-modal-title">工具详情</h3>
-      <p id="tool-modal-content" class="muted"></p>
-      <p class="muted">后端能力即将接入，当前仅为静态 Demo 展示。</p>
-      <button id="tool-modal-close" type="button" class="btn btn-secondary">关闭</button>
-    </article>
-  </div>
 
   <script>
     const bootstrap = { tokenRequired: ${tokenRequired ? 'true' : 'false'} }
@@ -649,39 +975,19 @@ function renderPage (tokenRequired: boolean): string {
     let eventSource = null
     let latestRequestId = null
     let manualLoggedOut = false
-    let selectedPage = 'chat'
-    let lastToolTrigger = null
     let reconnectTimer = null
 
-    const pageMeta = {
-      chat: { title: '对话创作', subtitle: '静态 Demo 预览，后端能力逐步接入。' },
-      assets: { title: '内容资产', subtitle: '支持本地搜索与标签筛选，不做持久化。' },
-      tools: { title: '工具', subtitle: '工具详情为静态内容，后端能力即将接入。' },
-      rag: { title: 'AI 知识库（RAG）', subtitle: '检索与指标均为 Demo 数据。' },
-      stats: { title: '数据统计', subtitle: '图表与指标为前端静态演示数据。' },
-      admin: { title: '管理', subtitle: '仅用于 Demo 设置展示，不存储到后端。' },
+    const phaseMeta = {
+      starting: { label: '正在启动', title: '等待企业微信连接', tone: 'neutral' },
+      'waiting-scan': { label: '等待扫码', title: '使用企业微信扫码登录', tone: 'warning' },
+      'waiting-verify-code': { label: '等待验证', title: '完成企业微信安全验证', tone: 'warning' },
+      'verify-code-submitted': { label: '正在验证', title: '正在确认验证码', tone: 'warning' },
+      'verify-code-expired': { label: '验证超时', title: '请重新扫码登录', tone: 'danger' },
+      'logged-in': { label: '已登录', title: '企业微信登录成功', tone: 'success' },
+      ready: { label: '运行中', title: '企业微信连接正常', tone: 'success' },
+      'logged-out': { label: '未登录', title: '企业微信已退出', tone: 'neutral' },
+      error: { label: '连接异常', title: '企业微信连接异常', tone: 'danger' },
     }
-
-    const toolDescriptions = {
-      '欢迎语': '根据客户来源与标签生成暖场欢迎语模板。',
-      '定时推送': '配置触达节奏、发送时段与内容包。',
-      '快捷回复': '沉淀高频问答，支持一键插入会话。',
-      '会话记录': '展示客户会话摘要和重点跟进建议。',
-      'AI 客户画像分析': '基于互动行为生成客户偏好与意向等级。',
-      'AI 老客维护策略推荐': '针对老客户生命周期给出分层维护策略。',
-    }
-
-    const statData = {
-      today: { chat: '1,280', customers: '436', aiRate: '78%', humanRate: '12%' },
-      '7d': { chat: '8,920', customers: '2,138', aiRate: '75%', humanRate: '15%' },
-      '30d': { chat: '34,600', customers: '8,406', aiRate: '73%', humanRate: '17%' },
-    }
-
-    const demoReplies = [
-      '已为你生成一版温暖风格的营销开场文案（Demo）。',
-      '建议结合客户标签补充一句专属利益点，可提升回复率（Demo）。',
-      '可以再加入活动截止时间，增强行动驱动（Demo）。',
-    ]
 
     const elements = {
       loginScreen: document.getElementById('login-screen'),
@@ -691,12 +997,13 @@ function renderPage (tokenRequired: boolean): string {
       loginPassword: document.getElementById('login-password'),
       loginSubmit: document.getElementById('login-submit'),
       loginError: document.getElementById('login-error'),
-      pageTitle: document.getElementById('page-title'),
-      pageSubtitle: document.getElementById('page-subtitle'),
-      navButtons: Array.from(document.querySelectorAll('.nav-btn')),
-      pages: Array.from(document.querySelectorAll('.page')),
       logoutBtn: document.getElementById('logout-btn'),
       serviceStatus: document.getElementById('service-status'),
+      sidebarStatusDot: document.getElementById('sidebar-status-dot'),
+      sidebarStatusText: document.getElementById('sidebar-status-text'),
+      sidebarStatusMessage: document.getElementById('sidebar-status-message'),
+      sidebarLoginUser: document.getElementById('sidebar-login-user'),
+      connectionTitle: document.getElementById('connection-title'),
       bridgePhase: document.getElementById('bridge-phase'),
       bridgeMessage: document.getElementById('bridge-message'),
       bridgeUpdatedAt: document.getElementById('bridge-updated-at'),
@@ -709,32 +1016,6 @@ function renderPage (tokenRequired: boolean): string {
       verifyCode: document.getElementById('verify-code'),
       verifySubmit: document.getElementById('verify-submit'),
       verifyFeedback: document.getElementById('verify-feedback'),
-      chatForm: document.getElementById('chat-form'),
-      chatInput: document.getElementById('chat-input'),
-      chatBox: document.getElementById('chat-box'),
-      quickButtons: Array.from(document.querySelectorAll('[data-quick]')),
-      assetSearch: document.getElementById('asset-search'),
-      assetItems: Array.from(document.querySelectorAll('.asset-item')),
-      toolButtons: Array.from(document.querySelectorAll('.tool-btn')),
-      toolModalMask: document.getElementById('tool-modal-mask'),
-      toolModalTitle: document.getElementById('tool-modal-title'),
-      toolModalContent: document.getElementById('tool-modal-content'),
-      toolModalClose: document.getElementById('tool-modal-close'),
-      ragQuery: document.getElementById('rag-query'),
-      ragForm: document.getElementById('rag-form'),
-      ragSearch: document.getElementById('rag-search'),
-      ragAdd: document.getElementById('rag-add'),
-      ragFeedback: document.getElementById('rag-feedback'),
-      tabButtons: Array.from(document.querySelectorAll('.tab-btn')),
-      metricChat: document.getElementById('metric-chat'),
-      metricCustomers: document.getElementById('metric-customers'),
-      metricAiRate: document.getElementById('metric-ai-rate'),
-      metricHumanRate: document.getElementById('metric-human-rate'),
-      adminBridgePhase: document.getElementById('admin-bridge-phase'),
-      adminWebStatus: document.getElementById('admin-web-status'),
-      themeToggle: document.getElementById('theme-toggle'),
-      notifyToggle: document.getElementById('notify-toggle'),
-      adminFeedback: document.getElementById('admin-feedback'),
     }
 
     function setHidden (element, hidden) {
@@ -760,11 +1041,11 @@ function renderPage (tokenRequired: boolean): string {
     function setVerifyFeedback (message, type) {
       if (!message) {
         elements.verifyFeedback.textContent = ''
-        elements.verifyFeedback.className = 'hidden'
+        elements.verifyFeedback.className = 'form-message hidden'
         return
       }
       elements.verifyFeedback.textContent = message
-      elements.verifyFeedback.className = type
+      elements.verifyFeedback.className = 'form-message ' + type
     }
 
     function showLoginScreen () {
@@ -777,43 +1058,74 @@ function renderPage (tokenRequired: boolean): string {
       setHidden(elements.appScreen, false)
     }
 
-    function setActivePage (pageKey) {
-      selectedPage = pageKey
-      const meta = pageMeta[pageKey] || pageMeta.chat
-      setText(elements.pageTitle, meta.title)
-      setText(elements.pageSubtitle, meta.subtitle)
-      elements.navButtons.forEach((button) => {
-        button.classList.toggle('active', button.dataset.nav === pageKey)
-      })
-      elements.pages.forEach((page) => {
-        page.classList.toggle('active', page.id === 'page-' + pageKey)
-      })
+    function setTone (element, tone) {
+      element.classList.remove('neutral', 'success', 'warning', 'danger')
+      element.classList.add(tone)
     }
 
-    function addChatMessage (text, role) {
-      const item = document.createElement('div')
-      item.className = 'chat-msg ' + role
-      item.textContent = text
-      elements.chatBox.appendChild(item)
-      elements.chatBox.scrollTop = elements.chatBox.scrollHeight
+    function renderQrPlaceholder (message) {
+      const icon = document.createElement('div')
+      icon.className = 'empty-qr'
+      icon.setAttribute('aria-hidden', 'true')
+      icon.textContent = '⌁'
+      const label = document.createElement('span')
+      label.textContent = message
+      elements.bridgeQr.replaceChildren(icon, label)
+    }
+
+    function formatUpdatedAt (value) {
+      const date = new Date(value)
+      if (Number.isNaN(date.getTime())) {
+        return value || '-'
+      }
+      return date.toLocaleString('zh-CN', { hour12: false })
     }
 
     function updateBridgeCards (status) {
-      setText(elements.bridgePhase, status.phase)
-      setText(elements.bridgeMessage, status.message)
-      setText(elements.bridgeUpdatedAt, status.lastUpdatedAt)
-      setText(elements.bridgeQrStatus, status.qrCodeStatus == null ? '-' : String(status.qrCodeStatus))
+      const meta = phaseMeta[status.phase] || { label: status.phase, title: '企业微信连接状态', tone: 'neutral' }
       const loginUser = status.loginUser == null
+        ? ''
+        : [status.loginUser.name, status.loginUser.id].filter(Boolean).join(' / ')
+      const isLoggedIn = ['ready', 'logged-in'].includes(status.phase)
+      const displayedUser = isLoggedIn && loginUser ? loginUser : '未登录'
+      const qrStatusLabels = {
+        Waiting: '等待扫码',
+        Scanned: '已扫码',
+        Confirmed: '已确认',
+        Timeout: '已过期',
+        Canceled: '已取消',
+        Cancelled: '已取消',
+      }
+      const qrStatus = status.qrCodeStatus == null
         ? '-'
-        : [status.loginUser.name, status.loginUser.id].filter(Boolean).join(' / ') || '-'
-      setText(elements.bridgeLoginUser, loginUser)
-      setText(elements.adminBridgePhase, 'Bridge：' + status.phase)
+        : (qrStatusLabels[String(status.qrCodeStatus)] || String(status.qrCodeStatus))
+
+      setText(elements.connectionTitle, meta.title)
+      setText(elements.bridgePhase, meta.label)
+      setText(elements.bridgeMessage, status.message)
+      setText(elements.bridgeUpdatedAt, formatUpdatedAt(status.lastUpdatedAt))
+      setText(elements.bridgeQrStatus, qrStatus)
+      setText(elements.bridgeLoginUser, displayedUser)
+      setText(elements.sidebarStatusText, meta.label)
+      setText(elements.sidebarStatusMessage, status.message)
+      setText(elements.sidebarLoginUser, displayedUser === '未登录' ? '尚未登录' : displayedUser)
+      setTone(elements.bridgePhase, meta.tone)
+      setTone(elements.sidebarStatusDot, meta.tone)
+      setTone(elements.serviceStatus, meta.tone)
+      elements.serviceStatus.replaceChildren(
+        document.createElement('i'),
+        document.createTextNode('Bridge · ' + meta.label),
+      )
 
       if (typeof status.qrCodeSvg === 'string' && status.qrCodeSvg.trim() !== '') {
         renderQrSvgAsImage(status.qrCodeSvg)
       } else {
-        elements.bridgeQr.textContent = '当前没有可展示的二维码。'
-        elements.bridgeQr.classList.add('muted')
+        const placeholder = isLoggedIn
+          ? '当前已登录，无需扫描二维码'
+          : status.phase === 'error'
+            ? '等待 Bridge 恢复后重新生成二维码'
+            : '二维码生成后将在这里显示'
+        renderQrPlaceholder(placeholder)
       }
 
       if (status.verifyCode && status.verifyCode.required) {
@@ -835,9 +1147,6 @@ function renderPage (tokenRequired: boolean): string {
         setVerifyFeedback('', '')
       }
 
-      const onlinePhases = ['ready', 'logged-in', 'verify-code-submitted', 'waiting-verify-code', 'waiting-scan']
-      const statusLabel = onlinePhases.includes(status.phase) ? '服务状态：在线' : '服务状态：离线/启动中'
-      setText(elements.serviceStatus, statusLabel)
     }
 
     function renderQrSvgAsImage (svg) {
@@ -850,13 +1159,10 @@ function renderPage (tokenRequired: boolean): string {
         const image = document.createElement('img')
         image.alt = 'Bridge 登录二维码'
         image.src = 'data:image/svg+xml;base64,' + btoa(binary)
-        image.style.width = 'min(100%, 280px)'
-        image.style.height = 'auto'
-        elements.bridgeQr.classList.remove('muted')
+        image.className = 'qr-image'
         elements.bridgeQr.replaceChildren(image)
       } catch {
-        elements.bridgeQr.textContent = '二维码渲染失败，请等待刷新。'
-        elements.bridgeQr.classList.add('muted')
+        renderQrPlaceholder('二维码渲染失败，请等待刷新')
       }
     }
 
@@ -952,19 +1258,13 @@ function renderPage (tokenRequired: boolean): string {
       connectEvents()
     }
 
-    elements.navButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        setActivePage(button.dataset.nav || 'chat')
-      })
-    })
-
     elements.loginForm.addEventListener('submit', async (event) => {
       event.preventDefault()
       setLoginError('')
       const username = elements.loginUsername.value.trim()
       const password = elements.loginPassword.value
       if (username !== 'admin') {
-        setLoginError('Demo 用户名固定为 admin。')
+        setLoginError('管理员账号固定为 admin。')
         return
       }
       elements.loginSubmit.disabled = true
@@ -1023,7 +1323,7 @@ function renderPage (tokenRequired: boolean): string {
         }
         applyLogoutState()
       } catch (error) {
-        setText(elements.pageSubtitle, error instanceof Error ? error.message : String(error))
+        setText(elements.bridgeMessage, error instanceof Error ? error.message : String(error))
       } finally {
         elements.logoutBtn.disabled = false
       }
@@ -1057,147 +1357,6 @@ function renderPage (tokenRequired: boolean): string {
       }
     })
 
-    elements.chatForm.addEventListener('submit', (event) => {
-      event.preventDefault()
-      const value = elements.chatInput.value.trim()
-      if (!value) {
-        return
-      }
-      addChatMessage(value, 'user')
-      const reply = demoReplies[Math.floor(Math.random() * demoReplies.length)]
-      setTimeout(() => {
-        addChatMessage(reply, 'ai')
-      }, 250)
-      elements.chatInput.value = ''
-    })
-
-    elements.quickButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        elements.chatInput.value = button.dataset.quick || ''
-        elements.chatInput.focus()
-      })
-    })
-
-    elements.assetSearch.addEventListener('input', () => {
-      const keyword = elements.assetSearch.value.trim().toLowerCase()
-      elements.assetItems.forEach((item) => {
-        const title = item.dataset.title ?? ''
-        const tags = item.dataset.tags ?? ''
-        const text = (title + ' ' + tags).toLowerCase()
-        item.classList.toggle('hidden', keyword !== '' && !text.includes(keyword))
-      })
-    })
-
-    function openToolModal (name, triggerButton) {
-      lastToolTrigger = triggerButton ?? null
-      setText(elements.toolModalTitle, name)
-      setText(elements.toolModalContent, toolDescriptions[name] || 'Demo 工具详情')
-      setHidden(elements.toolModalMask, false)
-      elements.toolModalClose.focus()
-    }
-
-    elements.toolButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        openToolModal(button.dataset.tool || '工具', button)
-      })
-    })
-
-    function closeToolModal () {
-      setHidden(elements.toolModalMask, true)
-      if (lastToolTrigger && typeof lastToolTrigger.focus === 'function') {
-        lastToolTrigger.focus()
-      }
-      lastToolTrigger = null
-    }
-
-    elements.toolModalClose.addEventListener('click', closeToolModal)
-    elements.toolModalMask.addEventListener('click', (event) => {
-      if (event.target === elements.toolModalMask) {
-        closeToolModal()
-      }
-    })
-
-    document.addEventListener('keydown', (event) => {
-      if (!elements.toolModalMask.classList.contains('hidden') && event.key === 'Tab') {
-        const focusables = Array.from(elements.toolModalMask.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        )).filter((element) => !element.hasAttribute('disabled'))
-        if (focusables.length > 0) {
-          const first = focusables[0]
-          const last = focusables[focusables.length - 1]
-          const active = document.activeElement
-          if (!focusables.includes(active)) {
-            event.preventDefault()
-            if (event.shiftKey) {
-              last.focus()
-            } else {
-              first.focus()
-            }
-          } else if (event.shiftKey && active === first) {
-            event.preventDefault()
-            last.focus()
-          } else if (!event.shiftKey && active === last) {
-            event.preventDefault()
-            first.focus()
-          }
-        }
-      }
-      if (event.key === 'Escape' && !elements.toolModalMask.classList.contains('hidden')) {
-        closeToolModal()
-      }
-    })
-
-    function setRagFeedback (text) {
-      setText(elements.ragFeedback, text)
-    }
-
-    function handleRagSearchSubmit () {
-      const query = elements.ragQuery.value.trim()
-      if (!query) {
-        setRagFeedback('请输入关键词后再检索（Demo）。')
-        return false
-      }
-      setRagFeedback('已完成 “' + query + '” 的 Demo 检索，后端能力即将接入。')
-      return true
-    }
-
-    elements.ragForm.addEventListener('submit', (event) => {
-      event.preventDefault()
-      handleRagSearchSubmit()
-    })
-
-    elements.ragAdd.addEventListener('click', () => {
-      setRagFeedback('已收到添加文档请求（Demo），当前不会持久化。')
-    })
-
-    elements.tabButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        const range = button.dataset.range || 'today'
-        const data = statData[range]
-        if (!data) {
-          return
-        }
-        elements.tabButtons.forEach((tab) => {
-          tab.classList.toggle('active', tab === button)
-        })
-        setText(elements.metricChat, data.chat)
-        setText(elements.metricCustomers, data.customers)
-        setText(elements.metricAiRate, data.aiRate)
-        setText(elements.metricHumanRate, data.humanRate)
-      })
-    })
-
-    function updateAdminFeedback () {
-      const themeText = elements.themeToggle.checked ? '暖色主题增强：开' : '暖色主题增强：关'
-      const notifyText = elements.notifyToggle.checked ? '通知提醒：开' : '通知提醒：关'
-      setText(elements.adminFeedback, themeText + '，' + notifyText + '（仅当前页面内存）')
-    }
-
-    elements.themeToggle.addEventListener('change', updateAdminFeedback)
-    elements.notifyToggle.addEventListener('change', updateAdminFeedback)
-    updateAdminFeedback()
-
-    setActivePage(selectedPage)
     void refreshStatus().catch((error) => {
       const message = error instanceof Error ? error.message : String(error)
       if (bootstrap.tokenRequired) {
@@ -1206,8 +1365,12 @@ function renderPage (tokenRequired: boolean): string {
         return
       }
       showAppScreen()
-      setText(elements.serviceStatus, '服务状态：初始化失败')
-      setText(elements.pageSubtitle, message)
+      setTone(elements.serviceStatus, 'danger')
+      elements.serviceStatus.replaceChildren(
+        document.createElement('i'),
+        document.createTextNode('Bridge · 初始化失败'),
+      )
+      setText(elements.bridgeMessage, message)
     })
   </script>
 </body>
