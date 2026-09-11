@@ -271,6 +271,30 @@ describe('BridgeWebControlPlane', () => {
     expect(repeated.status).toBe(409)
   })
 
+  it('destroys session on authenticated logout request', async () => {
+    const { baseUrl } = await startControlPlane()
+    const { cookie, csrfToken } = await createSession(baseUrl)
+
+    const logout = await fetch(`${baseUrl}/api/session`, {
+      method: 'DELETE',
+      headers: {
+        Cookie: cookie,
+        Origin: baseUrl,
+        'X-CSRF-Token': csrfToken,
+      },
+    })
+    const payload = await logout.json() as { ok: boolean }
+
+    expect(logout.status).toBe(200)
+    expect(payload.ok).toBe(true)
+    expect(logout.headers.get('set-cookie')).toContain('Max-Age=0')
+
+    const statusAfterLogout = await fetch(`${baseUrl}/api/status`, {
+      headers: { Cookie: cookie },
+    })
+    expect(statusAfterLogout.status).toBe(401)
+  })
+
   it('handles invalid format, submit errors, timeout, and state cleanup without leaking codes', async () => {
     const cancel = vi.fn(async () => {})
     const submit = vi.fn(async () => {

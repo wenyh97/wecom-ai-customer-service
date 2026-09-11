@@ -184,6 +184,44 @@ function readSingleHeader (value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
 }
 
+function isTrustedProxyAddress (remoteAddress: string | undefined): boolean {
+  if (!remoteAddress) {
+    return false
+  }
+  const normalized = remoteAddress.startsWith('::ffff:')
+    ? remoteAddress.slice('::ffff:'.length)
+    : remoteAddress
+  return normalized === '127.0.0.1' || normalized === '::1' || normalized === '0:0:0:0:0:0:0:1'
+}
+
+function isSecureRequest (request: http.IncomingMessage): boolean {
+  if ((request.socket as { encrypted?: boolean }).encrypted) {
+    return true
+  }
+  if (!isTrustedProxyAddress(request.socket.remoteAddress)) {
+    return false
+  }
+  const forwardedProto = readSingleHeader(request.headers['x-forwarded-proto']).toLowerCase()
+  if (forwardedProto === '') {
+    return false
+  }
+  return forwardedProto.split(',')[0]?.trim() === 'https'
+}
+
+function buildSessionCookie (request: http.IncomingMessage, sessionId: string, maxAgeSeconds: number): string {
+  const attributes = [
+    `bridge_web_session=${encodeURIComponent(sessionId)}`,
+    'HttpOnly',
+    'Path=/',
+    'SameSite=Strict',
+    `Max-Age=${maxAgeSeconds}`,
+  ]
+  if (isSecureRequest(request)) {
+    attributes.push('Secure')
+  }
+  return attributes.join('; ')
+}
+
 function renderPage (tokenRequired: boolean): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -217,7 +255,6 @@ function renderPage (tokenRequired: boolean): string {
     * { box-sizing: border-box; }
     body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); }
     button, input { font: inherit; }
-    button, input, [role="button"] { outline: none; }
     button:focus-visible, input:focus-visible, .nav-btn:focus-visible, .tab-btn:focus-visible {
       box-shadow: 0 0 0 3px rgba(156, 76, 57, 0.25);
     }
@@ -386,7 +423,7 @@ function renderPage (tokenRequired: boolean): string {
         <form id="login-form" class="login-form">
           <div class="field">
             <label for="login-username">用户名</label>
-            <input id="login-username" class="input" type="text" value="admin" required>
+            <input id="login-username" class="input" type="text" value="admin" readonly required>
           </div>
           <div class="field">
             <label for="login-password">密码</label>
@@ -530,10 +567,10 @@ function renderPage (tokenRequired: boolean): string {
                 <h3>AI 知识库（RAG）</h3>
                 <span class="demo-tag">静态指标 Demo</span>
               </div>
-              <div class="chat-compose" style="margin: 0 0 12px;">
+              <form id="rag-form" class="chat-compose" style="margin: 0 0 12px;">
                 <input id="rag-query" class="input" type="text" placeholder="输入检索关键词，例如：退换货政策">
-                <button id="rag-search" class="btn" type="button">检索</button>
-              </div>
+                <button id="rag-search" class="btn" type="submit">检索</button>
+              </form>
               <div class="tabs" style="margin-bottom: 10px;">
                 <span class="status-pill">命中率：82%</span>
                 <span class="status-pill">覆盖率：74%</span>
@@ -553,7 +590,7 @@ function renderPage (tokenRequired: boolean): string {
             <article class="card">
               <div class="section-head">
                 <h3>数据统计（Demo）</h3>
-                <div class="tabs" role="tablist" aria-label="时间范围">
+                <div class="tabs" aria-label="时间范围">
                   <button class="tab-btn active" data-range="today" type="button">今日</button>
                   <button class="tab-btn" data-range="7d" type="button">7天</button>
                   <button class="tab-btn" data-range="30d" type="button">30天</button>
@@ -597,7 +634,7 @@ function renderPage (tokenRequired: boolean): string {
     </section>
   </main>
 
-  <div id="tool-modal-mask" class="modal-mask hidden" role="dialog" aria-modal="true" aria-labelledby="tool-modal-title">
+  <div id="tool-modal-mask" class="modal-mask hidden" role="dialog" aria-modal="true" aria-labelledby="tool-modal-title" aria-describedby="tool-modal-content">
     <article class="modal">
       <h3 id="tool-modal-title">工具详情</h3>
       <p id="tool-modal-content" class="muted"></p>
@@ -613,6 +650,8 @@ function renderPage (tokenRequired: boolean): string {
     let latestRequestId = null
     let manualLoggedOut = false
     let selectedPage = 'chat'
+    let lastToolTrigger = null
+    let reconnectTimer = null
 
     const pageMeta = {
       chat: { title: '对话创作', subtitle: '静态 Demo 预览，后端能力逐步接入。' },
@@ -682,6 +721,7 @@ function renderPage (tokenRequired: boolean): string {
       toolModalContent: document.getElementById('tool-modal-content'),
       toolModalClose: document.getElementById('tool-modal-close'),
       ragQuery: document.getElementById('rag-query'),
+      ragForm: document.getElementById('rag-form'),
       ragSearch: document.getElementById('rag-search'),
       ragAdd: document.getElementById('rag-add'),
       ragFeedback: document.getElementById('rag-feedback'),
@@ -769,10 +809,11 @@ function renderPage (tokenRequired: boolean): string {
       setText(elements.bridgeLoginUser, loginUser)
       setText(elements.adminBridgePhase, 'Bridge：' + status.phase)
 
-      if (status.qrCodeSvg) {
-        elements.bridgeQr.innerHTML = status.qrCodeSvg
+      if (typeof status.qrCodeSvg === 'string' && status.qrCodeSvg.trim() !== '') {
+        renderQrSvgAsImage(status.qrCodeSvg)
       } else {
-        elements.bridgeQr.innerHTML = '<span class="muted">当前没有可展示的二维码。</span>'
+        elements.bridgeQr.textContent = '当前没有可展示的二维码。'
+        elements.bridgeQr.classList.add('muted')
       }
 
       if (status.verifyCode && status.verifyCode.required) {
@@ -797,6 +838,26 @@ function renderPage (tokenRequired: boolean): string {
       const onlinePhases = ['ready', 'logged-in', 'verify-code-submitted', 'waiting-verify-code', 'waiting-scan']
       const statusLabel = onlinePhases.includes(status.phase) ? '服务状态：在线' : '服务状态：离线/启动中'
       setText(elements.serviceStatus, statusLabel)
+    }
+
+    function renderQrSvgAsImage (svg) {
+      try {
+        const bytes = new TextEncoder().encode(svg)
+        let binary = ''
+        for (const value of bytes) {
+          binary += String.fromCharCode(value)
+        }
+        const image = document.createElement('img')
+        image.alt = 'Bridge 登录二维码'
+        image.src = 'data:image/svg+xml;base64,' + btoa(binary)
+        image.style.width = 'min(100%, 280px)'
+        image.style.height = 'auto'
+        elements.bridgeQr.classList.remove('muted')
+        elements.bridgeQr.replaceChildren(image)
+      } catch {
+        elements.bridgeQr.textContent = '二维码渲染失败，请等待刷新。'
+        elements.bridgeQr.classList.add('muted')
+      }
     }
 
     async function fetchJson (url, options) {
@@ -850,21 +911,38 @@ function renderPage (tokenRequired: boolean): string {
       eventSource.onerror = () => {
         eventSource.close()
         eventSource = null
-        setTimeout(() => {
+        if (reconnectTimer != null) {
+          clearTimeout(reconnectTimer)
+        }
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null
           void refreshStatus().catch(() => {})
         }, 1500)
       }
     }
 
-    async function refreshStatus () {
+    async function refreshStatus (allowRetry = true) {
       const sessionReady = await ensureSession()
       if (!sessionReady) {
         return
       }
       const statusResponse = await fetchJson('/api/status', { method: 'GET' })
       if (statusResponse.response.status === 401) {
+        if (eventSource) {
+          eventSource.close()
+          eventSource = null
+        }
         csrfToken = null
-        showLoginScreen()
+        if (bootstrap.tokenRequired) {
+          manualLoggedOut = false
+          showLoginScreen()
+          return
+        }
+        if (allowRetry) {
+          await refreshStatus(false)
+          return
+        }
+        throw new Error('控制台会话初始化失败，请检查 Bridge 服务状态。')
         return
       }
       if (!statusResponse.response.ok) {
@@ -911,7 +989,7 @@ function renderPage (tokenRequired: boolean): string {
       }
     })
 
-    elements.logoutBtn.addEventListener('click', () => {
+    function applyLogoutState () {
       manualLoggedOut = true
       csrfToken = null
       latestRequestId = null
@@ -922,7 +1000,33 @@ function renderPage (tokenRequired: boolean): string {
         eventSource.close()
         eventSource = null
       }
+      if (reconnectTimer != null) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
       showLoginScreen()
+    }
+
+    elements.logoutBtn.addEventListener('click', async () => {
+      elements.logoutBtn.disabled = true
+      try {
+        if (csrfToken) {
+          const destroyed = await fetchJson('/api/session', {
+            method: 'DELETE',
+            headers: {
+              'X-CSRF-Token': csrfToken,
+            },
+          })
+          if (!destroyed.response.ok) {
+            throw new Error(destroyed.payload.error || '退出失败，请重试。')
+          }
+        }
+        applyLogoutState()
+      } catch (error) {
+        setText(elements.pageSubtitle, error instanceof Error ? error.message : String(error))
+      } finally {
+        elements.logoutBtn.disabled = false
+      }
     })
 
     elements.verifyForm.addEventListener('submit', async (event) => {
@@ -977,12 +1081,15 @@ function renderPage (tokenRequired: boolean): string {
     elements.assetSearch.addEventListener('input', () => {
       const keyword = elements.assetSearch.value.trim().toLowerCase()
       elements.assetItems.forEach((item) => {
-        const text = (item.dataset.title + ' ' + item.dataset.tags).toLowerCase()
+        const title = item.dataset.title ?? ''
+        const tags = item.dataset.tags ?? ''
+        const text = (title + ' ' + tags).toLowerCase()
         item.classList.toggle('hidden', keyword !== '' && !text.includes(keyword))
       })
     })
 
-    function openToolModal (name) {
+    function openToolModal (name, triggerButton) {
+      lastToolTrigger = triggerButton ?? null
       setText(elements.toolModalTitle, name)
       setText(elements.toolModalContent, toolDescriptions[name] || 'Demo 工具详情')
       setHidden(elements.toolModalMask, false)
@@ -991,12 +1098,16 @@ function renderPage (tokenRequired: boolean): string {
 
     elements.toolButtons.forEach((button) => {
       button.addEventListener('click', () => {
-        openToolModal(button.dataset.tool || '工具')
+        openToolModal(button.dataset.tool || '工具', button)
       })
     })
 
     function closeToolModal () {
       setHidden(elements.toolModalMask, true)
+      if (lastToolTrigger && typeof lastToolTrigger.focus === 'function') {
+        lastToolTrigger.focus()
+      }
+      lastToolTrigger = null
     }
 
     elements.toolModalClose.addEventListener('click', closeToolModal)
@@ -1007,6 +1118,30 @@ function renderPage (tokenRequired: boolean): string {
     })
 
     document.addEventListener('keydown', (event) => {
+      if (!elements.toolModalMask.classList.contains('hidden') && event.key === 'Tab') {
+        const focusables = Array.from(elements.toolModalMask.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        )).filter((element) => !element.hasAttribute('disabled'))
+        if (focusables.length > 0) {
+          const first = focusables[0]
+          const last = focusables[focusables.length - 1]
+          const active = document.activeElement
+          if (!focusables.includes(active)) {
+            event.preventDefault()
+            if (event.shiftKey) {
+              last.focus()
+            } else {
+              first.focus()
+            }
+          } else if (event.shiftKey && active === first) {
+            event.preventDefault()
+            last.focus()
+          } else if (!event.shiftKey && active === last) {
+            event.preventDefault()
+            first.focus()
+          }
+        }
+      }
       if (event.key === 'Escape' && !elements.toolModalMask.classList.contains('hidden')) {
         closeToolModal()
       }
@@ -1016,13 +1151,19 @@ function renderPage (tokenRequired: boolean): string {
       setText(elements.ragFeedback, text)
     }
 
-    elements.ragSearch.addEventListener('click', () => {
+    function handleRagSearchSubmit () {
       const query = elements.ragQuery.value.trim()
       if (!query) {
         setRagFeedback('请输入关键词后再检索（Demo）。')
-        return
+        return false
       }
       setRagFeedback('已完成 “' + query + '” 的 Demo 检索，后端能力即将接入。')
+      return true
+    }
+
+    elements.ragForm.addEventListener('submit', (event) => {
+      event.preventDefault()
+      handleRagSearchSubmit()
     })
 
     elements.ragAdd.addEventListener('click', () => {
@@ -1058,8 +1199,15 @@ function renderPage (tokenRequired: boolean): string {
 
     setActivePage(selectedPage)
     void refreshStatus().catch((error) => {
-      showLoginScreen()
-      setLoginError(error instanceof Error ? error.message : String(error))
+      const message = error instanceof Error ? error.message : String(error)
+      if (bootstrap.tokenRequired) {
+        showLoginScreen()
+        setLoginError(message)
+        return
+      }
+      showAppScreen()
+      setText(elements.serviceStatus, '服务状态：初始化失败')
+      setText(elements.pageSubtitle, message)
     })
   </script>
 </body>
@@ -1383,8 +1531,32 @@ export class BridgeWebControlPlane {
           }
         }
         const session = this.createSession()
-        response.setHeader('Set-Cookie', `bridge_web_session=${encodeURIComponent(session.sessionId)}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${Math.floor(this.config.webSessionTtlMs / 1000)}`)
+        response.setHeader('Set-Cookie', buildSessionCookie(
+          request,
+          session.sessionId,
+          Math.floor(this.config.webSessionTtlMs / 1000),
+        ))
         writeJson(response, 200, { csrfToken: session.csrfToken, tokenRequired: this.tokenRequired })
+        return
+      }
+
+      if (url.pathname === '/api/session' && request.method === 'DELETE') {
+        const sessionRecord = this.authorizeSessionRequest(request)
+        if (!sessionRecord) {
+          writeJson(response, 401, { error: 'authentication required' })
+          return
+        }
+        if (!isSameOrigin(request)) {
+          writeJson(response, 403, { error: 'cross-site submit blocked' })
+          return
+        }
+        if (!safeCompare(readSingleHeader(request.headers['x-csrf-token']), sessionRecord.session.csrfToken)) {
+          writeJson(response, 403, { error: 'invalid csrf token' })
+          return
+        }
+        this.sessions.delete(sessionRecord.sessionId)
+        response.setHeader('Set-Cookie', buildSessionCookie(request, '', 0))
+        writeJson(response, 200, { ok: true })
         return
       }
 
