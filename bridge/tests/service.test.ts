@@ -7,6 +7,11 @@ function createConfig (overrides: Partial<BridgeConfig> = {}): BridgeConfig {
     puppetServiceAuthority: 'token-service-discovery-test.juzibot.com',
     aiApiBaseUrl: 'http://app:8000',
     aiBridgeToken: 'bridge-token',
+    webHost: '127.0.0.1',
+    webPort: 18080,
+    webToken: 'bridge-web-token',
+    webSessionTtlMs: 60_000,
+    webVerifyTimeoutMs: 300_000,
     messageTimeoutMs: 20000,
     apiMaxRetries: 1,
     replyMaxLength: 20,
@@ -81,6 +86,23 @@ describe('loadConfig', () => {
     })
     expect(config.puppetServiceAuthority).toBe('token-service-discovery-test.juzibot.com')
     expect(Array.from(config.contactWhitelist)).toEqual(['contact-1', 'contact-2'])
+    expect(config.webHost).toBe('127.0.0.1')
+    expect(config.webPort).toBe(18080)
+  })
+
+  it('requires a web token when the control plane binds beyond loopback', () => {
+    expect(() => loadConfig({
+      WECHATY_PUPPET_SERVICE_TOKEN: 'workpro-token',
+      AI_BRIDGE_TOKEN: 'bridge-token',
+      BRIDGE_WEB_HOST: '0.0.0.0',
+    })).not.toThrow()
+
+    expect(() => createBridgeApplication(createConfig({
+      webHost: '0.0.0.0',
+      webToken: '',
+    }), vi.fn() as unknown as typeof fetch, createLogger().logger)).toThrow(
+      'BRIDGE_WEB_TOKEN is required when BRIDGE_WEB_HOST is not loopback',
+    )
   })
 })
 
