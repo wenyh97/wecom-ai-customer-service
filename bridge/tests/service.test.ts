@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { HttpBridgeApiClient, WechatyWorkProBridge, createConsoleLogger, loadConfig, type BridgeApiClient, type BridgeConfig, type BridgeLogger } from '../src/service'
+import { HttpBridgeApiClient, WechatyWorkProBridge, createBridgeApplication, createConsoleLogger, loadConfig, type BridgeApiClient, type BridgeConfig, type BridgeLogger } from '../src/service'
 
 function createConfig (overrides: Partial<BridgeConfig> = {}): BridgeConfig {
   return {
@@ -85,6 +85,14 @@ describe('loadConfig', () => {
 })
 
 describe('WechatyWorkProBridge', () => {
+  it('creates the bridge application without requiring a real token at test time', () => {
+    const app = createBridgeApplication(createConfig(), vi.fn() as unknown as typeof fetch, createLogger().logger)
+
+    expect(app.bot).toBeDefined()
+    expect(app.bridge).toBeInstanceOf(WechatyWorkProBridge)
+    expect(typeof app.start).toBe('function')
+  })
+
   it('friendship defaults to deny and only accepts receive on explicit config', async () => {
     const apiClient: BridgeApiClient = { requestReply: vi.fn() }
     const { logger } = createLogger()
