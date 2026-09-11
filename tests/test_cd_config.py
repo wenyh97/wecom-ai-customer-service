@@ -15,6 +15,7 @@ def test_cd_builds_and_deploys_bridge_image() -> None:
     assert 'file: ./bridge/Dockerfile' in workflow
     assert 'BRIDGE_IMAGE_REF: ${{ env.BRIDGE_IMAGE_NAME }}:sha-${{ github.sha }}' in workflow
     assert 'docker compose --profile workpro pull app migrate wechaty-bridge' in workflow
+    assert 'docker compose pull mysql redis' in workflow
     assert 'docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge' in workflow
 
 

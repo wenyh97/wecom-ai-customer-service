@@ -203,6 +203,7 @@ docker compose --profile workpro run --rm --entrypoint sh wechaty-bridge -lc \
 cp .env.example .env
 # 填写真实密码/密钥；APP_IMAGE / BRIDGE_IMAGE 由 CD 自动维护
 docker compose pull app migrate
+docker compose pull mysql redis
 docker compose --profile ops run --rm migrate
 docker compose up -d --no-build app mysql redis
 curl -f http://127.0.0.1:8000/health

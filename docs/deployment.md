@@ -32,6 +32,7 @@
 
 ```bash
 docker compose pull app migrate
+docker compose pull mysql redis
 docker compose --profile ops run --rm migrate
 docker compose up -d --no-build app mysql redis
 curl -f http://127.0.0.1:8000/health
@@ -119,10 +120,11 @@ CD 工作流执行顺序：
 4. 在服务器检查 `$DEPLOY_PATH/.env` 已存在，且至少包含 `MYSQL_USER`、`MYSQL_PASSWORD`、`MYSQL_ROOT_PASSWORD`、`DATABASE_URL`；
 5. 原子更新 `.env` 中的 `APP_IMAGE` / `BRIDGE_IMAGE` 为本次 immutable SHA 镜像（若不存在则追加），不改写其他配置；
 6. 若 `DEPLOY_WORKPRO=true`，先校验 `WECHATY_PUPPET_SERVICE_TOKEN`、`AI_BRIDGE_TOKEN`、`BRIDGE_WEB_TOKEN` 已在服务器 `.env` 配置，再执行 `docker compose --profile workpro pull app migrate wechaty-bridge`；否则记录 `WorkPro disabled` 并只执行 `docker compose pull app migrate`；
-7. `docker compose --profile ops run --rm migrate`；
-8. `docker compose up -d --no-build app mysql redis`，随后执行 app `/health` 校验并输出 `docker compose ps`；
-9. 若 `DEPLOY_WORKPRO=true`，执行 `docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge`，等待容器健康检查通过，再校验 `http://127.0.0.1:${BRIDGE_WEB_PORT:-18080}/health` 并输出 `docker compose --profile workpro ps`；
-10. 任一步失败均返回非零，CD 标红。
+7. 执行 `docker compose pull mysql redis`，确保 fresh server 或清理缓存后的宿主机仍可配合 `--no-build` 拉起基础服务；
+8. `docker compose --profile ops run --rm migrate`；
+9. `docker compose up -d --no-build app mysql redis`，随后执行 app `/health` 校验并输出 `docker compose ps`；
+10. 若 `DEPLOY_WORKPRO=true`，执行 `docker compose --profile workpro up -d --no-build --force-recreate --no-deps wechaty-bridge`，等待容器健康检查通过，再校验 `http://127.0.0.1:${BRIDGE_WEB_PORT:-18080}/health` 并输出 `docker compose --profile workpro ps`；
+11. 任一步失败均返回非零，CD 标红。
 
 若迁移失败，发布应停止，不应继续重启应用容器。
 
