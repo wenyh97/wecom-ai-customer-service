@@ -834,7 +834,7 @@ function renderPage (tokenRequired: boolean): string {
       </aside>
 
       <section class="content">
-        <div class="sr-only">
+        <div class="sr-only" aria-live="polite" aria-atomic="true">
           <h2 id="page-title">账号链接</h2>
           <p class="muted" id="page-subtitle">统一管理企业微信账号绑定、扫码登录与验证码校验。</p>
         </div>
@@ -1020,9 +1020,9 @@ function renderPage (tokenRequired: boolean): string {
                       <span class="status-pill">当前展示</span>
                     </div>
                     <div class="donut-grid">
-                      <div class="donut-card"><div class="donut-ring" style="--ratio:252deg"><span>70%</span></div><div><strong>新客激活</strong><p>首次触达后 24 小时内保持响应</p></div></div>
-                      <div class="donut-card"><div class="donut-ring" style="--ratio:144deg"><span>40%</span></div><div><strong>重点跟进</strong><p>进入高意向池并持续追踪</p></div></div>
-                      <div class="donut-card"><div class="donut-ring" style="--ratio:94deg"><span>26%</span></div><div><strong>老客复购</strong><p>维护周期内再次成交占比</p></div></div>
+                      <div class="donut-card"><div class="donut-ring" role="img" aria-label="新客激活占比 70%，首次触达后 24 小时内保持响应" style="--ratio:252deg"><span aria-hidden="true">70%</span></div><div><strong>新客激活</strong><p>首次触达后 24 小时内保持响应</p></div></div>
+                      <div class="donut-card"><div class="donut-ring" role="img" aria-label="重点跟进占比 40%，进入高意向池并持续追踪" style="--ratio:144deg"><span aria-hidden="true">40%</span></div><div><strong>重点跟进</strong><p>进入高意向池并持续追踪</p></div></div>
+                      <div class="donut-card"><div class="donut-ring" role="img" aria-label="老客复购占比 26%，维护周期内再次成交占比" style="--ratio:94deg"><span aria-hidden="true">26%</span></div><div><strong>老客复购</strong><p>维护周期内再次成交占比</p></div></div>
                     </div>
                   </article>
                 </div>
@@ -1677,6 +1677,31 @@ function renderPage (tokenRequired: boolean): string {
       }
     }
 
+    function renderBridgeErrorState (message) {
+      const errorStatus = {
+        phase: 'error',
+        message,
+        lastUpdatedAt: new Date().toISOString(),
+        qrCodeSvg: null,
+        qrCodeStatus: null,
+        qrCodeUpdatedAt: null,
+        loginUser: null,
+        verifyCode: null,
+      }
+      setText(elements.bridgePhase, errorStatus.phase)
+      setText(elements.bridgeMessage, errorStatus.message)
+      setText(elements.bridgeUpdatedAt, errorStatus.lastUpdatedAt)
+      setText(elements.bridgeQrStatus, '-')
+      setText(elements.bridgeLoginUser, '-')
+      elements.bridgeQr.textContent = '当前没有可展示的二维码。'
+      elements.bridgeQr.classList.add('muted')
+      latestRequestId = null
+      setHidden(elements.verifyWrap, true)
+      elements.verifyCode.value = ''
+      setVerifyFeedback('', '')
+      updateAccountSummary(errorStatus)
+    }
+
     function renderQrSvgAsImage (svg) {
       try {
         const bytes = new TextEncoder().encode(svg)
@@ -2086,18 +2111,7 @@ function renderPage (tokenRequired: boolean): string {
         return
       }
       showAppScreen()
-      if (!statsState.initialized) {
-        updateBridgeCards({
-          phase: 'error',
-          message,
-          lastUpdatedAt: new Date().toISOString(),
-          qrCodeSvg: null,
-          qrCodeStatus: null,
-          qrCodeUpdatedAt: null,
-          loginUser: null,
-          verifyCode: null,
-        })
-      }
+      renderBridgeErrorState(message)
       renderStatsError(message)
       setContentNotice(message)
     })
