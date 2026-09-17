@@ -3,7 +3,13 @@ import { EventEmitter } from 'node:events'
 import http from 'node:http'
 
 import type { BridgeLogger } from '../src/service'
-import { BridgeWebControlPlane, type BridgeWebConfig } from '../src/web-control'
+import {
+  BridgeWebControlPlane,
+  computeBridgeModelConfigState,
+  deriveBridgeConsoleRoute,
+  normalizeBridgeConsolePage,
+  type BridgeWebConfig,
+} from '../src/web-control'
 import { createVerifyCodeSubmitter } from '../src/verify-code'
 import type { VerifyCodeSubmitter } from '../src/verify-code'
 
@@ -171,24 +177,26 @@ describe('BridgeWebControlPlane', () => {
     expect(sse.body).toContain('waiting-scan')
   })
 
-  it('renders demo login and marketing workspace pages while keeping bridge controls', async () => {
+  it('renders the productized admin console while keeping bridge controls', async () => {
     const { baseUrl } = await startControlPlane()
 
     const response = await fetch(`${baseUrl}/`)
     const html = await response.text()
 
     expect(response.status).toBe(200)
-    expect(html).toContain('麻花 AI 营销工作台（Demo）')
-    expect(html).toContain('Demo 登录')
+    expect(html).toContain('AI企微客户运营')
+    expect(html).toContain('平台登录')
     expect(html).toContain('id="login-username"')
     expect(html).toContain('value="admin"')
     expect(html).toContain('用户名固定为 <strong>admin</strong>')
-    expect(html).toContain('对话创作')
-    expect(html).toContain('内容资产')
+    expect(html).toContain('账号链接')
     expect(html).toContain('工具')
     expect(html).toContain('AI 知识库（RAG）')
     expect(html).toContain('数据统计')
-    expect(html).toContain('管理')
+    expect(html).toContain('模型配置')
+    expect(html).toContain('人员管理')
+    expect(html).toContain('团队管理')
+    expect(html).toContain('权限管理')
     expect(html).toContain('欢迎语')
     expect(html).toContain('定时推送')
     expect(html).toContain('快捷回复')
@@ -196,13 +204,19 @@ describe('BridgeWebControlPlane', () => {
     expect(html).toContain('AI 客户画像分析')
     expect(html).toContain('AI 老客维护策略推荐')
     expect(html).toContain('连接状态（保留真实 Bridge 能力）')
+    expect(html).toContain('内容资产已合并到工具中心')
+    expect(html).toContain('业务统计接入状态')
+    expect(html).toContain('待接入用户 API')
     expect(html).toContain('id="bridge-qr"')
     expect(html).toContain('id="verify-form"')
+    expect(html).toContain('id="model-config-form"')
     expect(html).toContain('/api/session')
     expect(html).toContain('/api/status')
     expect(html).toContain('/api/events')
     expect(html).toContain('/api/verify-code')
-    expect(html).toContain('后端能力即将接入')
+    expect(html).not.toContain('对话创作')
+    expect(html).not.toContain('Demo 设置')
+    expect(html).not.toContain('本地工作空间')
   })
 
   it('requires authentication and csrf protection for verify-code submission', async () => {
@@ -378,5 +392,95 @@ describe('BridgeWebControlPlane', () => {
     expect(readyStatus.phase).toBe('ready')
     expect(readyStatus.qrCodeSvg).toBeNull()
     expect(readyStatus.loginUser).toEqual({ id: 'lo***56', name: 'Tester' })
+  })
+})
+
+describe('bridge console routing helpers', () => {
+  it('maps legacy pages to the new productized navigation keys', () => {
+    expect(normalizeBridgeConsolePage('chat')).toBe('account')
+    expect(normalizeBridgeConsolePage('#assets')).toBe('tools')
+    expect(normalizeBridgeConsolePage('admin')).toBe('model-config')
+    expect(normalizeBridgeConsolePage('permissions')).toBe('permissions')
+    expect(normalizeBridgeConsolePage('unknown')).toBe('account')
+  })
+
+  it('routes legacy content-assets entry to the tools assets section', () => {
+    expect(deriveBridgeConsoleRoute('#assets', null)).toEqual({
+      page: 'tools',
+      toolGroup: 'assets',
+      scrollToAssets: true,
+    })
+    expect(deriveBridgeConsoleRoute('#content-assets', null)).toEqual({
+      page: 'tools',
+      toolGroup: 'assets',
+      scrollToAssets: true,
+    })
+    expect(deriveBridgeConsoleRoute('', 'chat')).toEqual({
+      page: 'account',
+      toolGroup: 'operations',
+      scrollToAssets: false,
+    })
+  })
+
+  describe('bridge model config helpers', () => {
+    it('keeps the api key configured state when the form is saved without key changes', () => {
+      expect(computeBridgeModelConfigState({
+        provider: 'openai-compatible',
+        baseUrl: 'https://api.example.com/v1',
+        model: 'gpt-4o-mini',
+        timeoutMs: '20000',
+        enabled: true,
+        apiKeyConfigured: true,
+      }, {
+        provider: 'custom',
+        baseUrl: ' https://proxy.example.com/v1 ',
+        model: ' deepseek-chat ',
+        timeoutMs: '30000',
+        enabled: false,
+        apiKeyValue: '',
+        clearApiKey: false,
+      })).toEqual({
+        provider: 'custom',
+        baseUrl: 'https://proxy.example.com/v1',
+        model: 'deepseek-chat',
+        timeoutMs: '30000',
+        enabled: false,
+        apiKeyConfigured: true,
+      })
+    })
+
+    it('supports explicitly clearing or replacing the masked api key state', () => {
+      const cleared = computeBridgeModelConfigState({
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        timeoutMs: '20000',
+        enabled: false,
+        apiKeyConfigured: true,
+      }, {
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        timeoutMs: '',
+        enabled: false,
+        apiKeyValue: '',
+        clearApiKey: true,
+      })
+
+      const replaced = computeBridgeModelConfigState(cleared, {
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        timeoutMs: '',
+        enabled: true,
+        apiKeyValue: 'new-key',
+        clearApiKey: false,
+      })
+
+      expect(cleared.apiKeyConfigured).toBe(false)
+      expect(cleared.timeoutMs).toBe('20000')
+      expect(replaced.apiKeyConfigured).toBe(true)
+      expect(replaced.enabled).toBe(true)
+    })
   })
 })
