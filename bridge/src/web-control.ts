@@ -1144,11 +1144,10 @@ function renderPage (tokenRequired: boolean): string {
 
     function renderStatsError (message) {
       setText(elements.statsSyncState, '同步失败')
-      setHidden(elements.statsLoading, false)
+      setHidden(elements.statsLoading, true)
       setText(elements.statsErrorText, message)
       setHidden(elements.statsError, false)
       if (statsState.initialized) {
-        setHidden(elements.statsLoading, true)
         setHidden(elements.statsContent, false)
       } else {
         setHidden(elements.statsContent, true)
@@ -1562,23 +1561,28 @@ function renderPage (tokenRequired: boolean): string {
       elements.modelApiKey.value = ''
     })
 
-    window.addEventListener('hashchange', () => {
+    function applyRouteState (focusPageTitle) {
       const route = deriveRouteState()
       setActiveToolGroup(route.toolGroup)
-      setActivePage(route.page, { updateHash: false, focus: true })
+      setActivePage(route.page, { updateHash: false, focus: focusPageTitle })
       if (route.scrollToAssets) {
         const assetSection = document.getElementById('tools-assets-section')
         if (assetSection) {
           assetSection.scrollIntoView({ block: 'start', behavior: 'smooth' })
         }
       }
+    }
+
+    window.addEventListener('hashchange', () => {
+      applyRouteState(true)
+    })
+    window.addEventListener('popstate', () => {
+      applyRouteState(true)
     })
 
     applyPermissionGuards()
     renderModelConfigState('尚未保存临时配置。')
-    const initialRoute = deriveRouteState()
-    setActiveToolGroup(initialRoute.toolGroup)
-    setActivePage(initialRoute.page, { updateHash: false, focus: false })
+    applyRouteState(false)
     void refreshStatus().catch((error) => {
       const message = error instanceof Error ? error.message : String(error)
       renderStatsError(message)
