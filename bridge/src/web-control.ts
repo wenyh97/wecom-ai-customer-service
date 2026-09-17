@@ -222,6 +222,52 @@ function buildSessionCookie (request: http.IncomingMessage, sessionId: string, m
   return attributes.join('; ')
 }
 
+const BRIDGE_CONSOLE_ROUTE_ALIASES = {
+  chat: 'account',
+  account: 'account',
+  'account-link': 'account',
+  assets: 'tools',
+  'content-assets': 'tools',
+  tools: 'tools',
+  rag: 'rag',
+  stats: 'stats',
+  admin: 'model-config',
+  model: 'model-config',
+  'model-config': 'model-config',
+  people: 'people',
+  teams: 'teams',
+  permissions: 'permissions',
+} as const
+
+type BridgeConsolePage = typeof BRIDGE_CONSOLE_ROUTE_ALIASES[keyof typeof BRIDGE_CONSOLE_ROUTE_ALIASES]
+type BridgeConsoleToolGroup = 'operations' | 'assets'
+
+export interface BridgeConsoleRoute {
+  page: BridgeConsolePage
+  toolGroup: BridgeConsoleToolGroup
+  scrollToAssets: boolean
+}
+
+export function normalizeBridgeConsolePage (raw: string | null | undefined): BridgeConsolePage {
+  const normalized = String(raw ?? '').trim().replace(/^#+/, '').toLowerCase()
+  return BRIDGE_CONSOLE_ROUTE_ALIASES[normalized as keyof typeof BRIDGE_CONSOLE_ROUTE_ALIASES] ?? 'account'
+}
+
+export function deriveBridgeConsoleRoute (
+  hash: string | null | undefined,
+  queryPage: string | null | undefined,
+): BridgeConsoleRoute {
+  const hashValue = String(hash ?? '').trim().replace(/^#+/, '').toLowerCase()
+  const queryValue = String(queryPage ?? '').trim().toLowerCase()
+  const raw = hashValue || queryValue || 'account'
+  const scrollToAssets = raw === 'assets' || raw === 'content-assets'
+  return {
+    page: normalizeBridgeConsolePage(raw),
+    toolGroup: scrollToAssets ? 'assets' : 'operations',
+    scrollToAssets,
+  }
+}
+
 function renderPage (tokenRequired: boolean): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -470,7 +516,7 @@ function renderPage (tokenRequired: boolean): string {
       <section class="content">
         <header class="topbar">
           <div>
-            <h2 id="page-title">账号链接</h2>
+            <h2 id="page-title" tabindex="-1">账号链接</h2>
             <p class="muted" id="page-subtitle">统一管理企业微信账号绑定、扫码登录与验证码校验。</p>
           </div>
         </header>
@@ -690,6 +736,7 @@ function renderPage (tokenRequired: boolean): string {
                     <label for="model-api-key">API Key（重新输入才会更新）</label>
                     <input id="model-api-key" class="input" type="password" autocomplete="new-password" placeholder="已配置时不会回显真实值">
                   </div>
+                  <label style="display:flex;align-items:center;gap:8px;"><input id="model-clear-api-key" type="checkbox">清除已保存的 API Key 状态</label>
                   <label style="display:flex;align-items:center;gap:8px;"><input id="model-enabled" type="checkbox">启用当前模型配置</label>
                   <div class="tabs">
                     <button id="model-config-save" class="btn" type="submit" data-permission="manageModels">保存配置</button>
@@ -787,22 +834,13 @@ function renderPage (tokenRequired: boolean): string {
   <script>
     const productName = 'AI企微客户运营'
     const bootstrap = { tokenRequired: ${tokenRequired ? 'true' : 'false'} }
-    const pageAliases = {
-      chat: 'account',
-      account: 'account',
-      'account-link': 'account',
-      assets: 'tools',
-      'content-assets': 'tools',
-      tools: 'tools',
-      rag: 'rag',
-      stats: 'stats',
-      admin: 'model-config',
-      model: 'model-config',
-      'model-config': 'model-config',
-      people: 'people',
-      teams: 'teams',
-      permissions: 'permissions',
-    }
+    const pageAliases = ${JSON.stringify(BRIDGE_CONSOLE_ROUTE_ALIASES)}
+    const permissionDescriptors = [
+      { key: 'manageModels', labelId: 'perm-models' },
+      { key: 'managePeople', labelId: 'perm-people' },
+      { key: 'manageTeams', labelId: 'perm-teams' },
+      { key: 'managePermissions', labelId: 'perm-permissions' },
+    ]
     const currentUser = {
       username: 'admin',
       permissions: {
@@ -917,16 +955,13 @@ function renderPage (tokenRequired: boolean): string {
       modelName: document.getElementById('model-name'),
       modelTimeout: document.getElementById('model-timeout'),
       modelApiKey: document.getElementById('model-api-key'),
+      modelClearApiKey: document.getElementById('model-clear-api-key'),
       modelEnabled: document.getElementById('model-enabled'),
       modelConfigReset: document.getElementById('model-config-reset'),
       modelConfigFeedback: document.getElementById('model-config-feedback'),
       modelApiKeyStatus: document.getElementById('model-api-key-status'),
       modelEnabledStatus: document.getElementById('model-enabled-status'),
       permissionNodes: Array.from(document.querySelectorAll('[data-permission]')),
-      permModels: document.getElementById('perm-models'),
-      permPeople: document.getElementById('perm-people'),
-      permTeams: document.getElementById('perm-teams'),
-      permPermissions: document.getElementById('perm-permissions'),
     }
 
     document.title = productName
@@ -1021,27 +1056,24 @@ function renderPage (tokenRequired: boolean): string {
         syncLocationHash()
       }
       document.title = productName
+      if (settings.focus !== false) {
+        elements.pageTitle.focus()
+      }
     }
 
     function applyPermissionGuards () {
-      const permissionMap = {
-        manageModels: currentUser.permissions.manageModels,
-        managePeople: currentUser.permissions.managePeople,
-        manageTeams: currentUser.permissions.manageTeams,
-        managePermissions: currentUser.permissions.managePermissions,
-      }
       elements.permissionNodes.forEach((node) => {
         const permissionKey = node.getAttribute('data-permission')
-        const allowed = Boolean(permissionMap[permissionKey] ?? false)
+        const allowed = Boolean(currentUser.permissions[permissionKey] ?? false)
         if ('disabled' in node) {
           node.disabled = !allowed
         }
         node.setAttribute('aria-disabled', allowed ? 'false' : 'true')
       })
-      setText(elements.permModels, currentUser.permissions.manageModels ? '可管理' : '只读')
-      setText(elements.permPeople, currentUser.permissions.managePeople ? '可管理' : '只读')
-      setText(elements.permTeams, currentUser.permissions.manageTeams ? '可管理' : '只读')
-      setText(elements.permPermissions, currentUser.permissions.managePermissions ? '可管理' : '只读')
+      permissionDescriptors.forEach((descriptor) => {
+        const label = document.getElementById(descriptor.labelId)
+        setText(label, currentUser.permissions[descriptor.key] ? '可管理' : '只读')
+      })
     }
 
     function renderModelConfigState (feedback) {
@@ -1049,6 +1081,7 @@ function renderPage (tokenRequired: boolean): string {
       elements.modelBaseUrl.value = modelConfigState.baseUrl
       elements.modelName.value = modelConfigState.model
       elements.modelTimeout.value = modelConfigState.timeoutMs
+      elements.modelClearApiKey.checked = false
       elements.modelEnabled.checked = modelConfigState.enabled
       setText(elements.modelApiKeyStatus, modelConfigState.apiKeyConfigured ? '已配置（仅当前页面内存）' : '未配置')
       setText(elements.modelEnabledStatus, modelConfigState.enabled ? '已启用' : '未启用')
@@ -1515,7 +1548,9 @@ function renderPage (tokenRequired: boolean): string {
       modelConfigState.model = elements.modelName.value.trim()
       modelConfigState.timeoutMs = elements.modelTimeout.value.trim() || '20000'
       modelConfigState.enabled = elements.modelEnabled.checked
-      if (elements.modelApiKey.value.trim() !== '') {
+      if (elements.modelClearApiKey.checked) {
+        modelConfigState.apiKeyConfigured = false
+      } else if (elements.modelApiKey.value.trim() !== '') {
         modelConfigState.apiKeyConfigured = true
       }
       elements.modelApiKey.value = ''
@@ -1530,7 +1565,7 @@ function renderPage (tokenRequired: boolean): string {
     window.addEventListener('hashchange', () => {
       const route = deriveRouteState()
       setActiveToolGroup(route.toolGroup)
-      setActivePage(route.page, { updateHash: false })
+      setActivePage(route.page, { updateHash: false, focus: true })
       if (route.scrollToAssets) {
         const assetSection = document.getElementById('tools-assets-section')
         if (assetSection) {
@@ -1543,7 +1578,7 @@ function renderPage (tokenRequired: boolean): string {
     renderModelConfigState('尚未保存临时配置。')
     const initialRoute = deriveRouteState()
     setActiveToolGroup(initialRoute.toolGroup)
-    setActivePage(initialRoute.page, { updateHash: false })
+    setActivePage(initialRoute.page, { updateHash: false, focus: false })
     void refreshStatus().catch((error) => {
       const message = error instanceof Error ? error.message : String(error)
       renderStatsError(message)

@@ -3,7 +3,12 @@ import { EventEmitter } from 'node:events'
 import http from 'node:http'
 
 import type { BridgeLogger } from '../src/service'
-import { BridgeWebControlPlane, type BridgeWebConfig } from '../src/web-control'
+import {
+  BridgeWebControlPlane,
+  deriveBridgeConsoleRoute,
+  normalizeBridgeConsolePage,
+  type BridgeWebConfig,
+} from '../src/web-control'
 import { createVerifyCodeSubmitter } from '../src/verify-code'
 import type { VerifyCodeSubmitter } from '../src/verify-code'
 
@@ -386,5 +391,33 @@ describe('BridgeWebControlPlane', () => {
     expect(readyStatus.phase).toBe('ready')
     expect(readyStatus.qrCodeSvg).toBeNull()
     expect(readyStatus.loginUser).toEqual({ id: 'lo***56', name: 'Tester' })
+  })
+})
+
+describe('bridge console routing helpers', () => {
+  it('maps legacy pages to the new productized navigation keys', () => {
+    expect(normalizeBridgeConsolePage('chat')).toBe('account')
+    expect(normalizeBridgeConsolePage('#assets')).toBe('tools')
+    expect(normalizeBridgeConsolePage('admin')).toBe('model-config')
+    expect(normalizeBridgeConsolePage('permissions')).toBe('permissions')
+    expect(normalizeBridgeConsolePage('unknown')).toBe('account')
+  })
+
+  it('routes legacy content-assets entry to the tools assets section', () => {
+    expect(deriveBridgeConsoleRoute('#assets', null)).toEqual({
+      page: 'tools',
+      toolGroup: 'assets',
+      scrollToAssets: true,
+    })
+    expect(deriveBridgeConsoleRoute('#content-assets', null)).toEqual({
+      page: 'tools',
+      toolGroup: 'assets',
+      scrollToAssets: true,
+    })
+    expect(deriveBridgeConsoleRoute('', 'chat')).toEqual({
+      page: 'account',
+      toolGroup: 'operations',
+      scrollToAssets: false,
+    })
   })
 })
