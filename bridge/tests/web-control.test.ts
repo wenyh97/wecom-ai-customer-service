@@ -5,6 +5,7 @@ import http from 'node:http'
 import type { BridgeLogger } from '../src/service'
 import {
   BridgeWebControlPlane,
+  computeBridgeModelConfigState,
   deriveBridgeConsoleRoute,
   normalizeBridgeConsolePage,
   type BridgeWebConfig,
@@ -418,6 +419,68 @@ describe('bridge console routing helpers', () => {
       page: 'account',
       toolGroup: 'operations',
       scrollToAssets: false,
+    })
+  })
+
+  describe('bridge model config helpers', () => {
+    it('keeps the api key configured state when the form is saved without key changes', () => {
+      expect(computeBridgeModelConfigState({
+        provider: 'openai-compatible',
+        baseUrl: 'https://api.example.com/v1',
+        model: 'gpt-4o-mini',
+        timeoutMs: '20000',
+        enabled: true,
+        apiKeyConfigured: true,
+      }, {
+        provider: 'custom',
+        baseUrl: ' https://proxy.example.com/v1 ',
+        model: ' deepseek-chat ',
+        timeoutMs: '30000',
+        enabled: false,
+        apiKeyValue: '',
+        clearApiKey: false,
+      })).toEqual({
+        provider: 'custom',
+        baseUrl: 'https://proxy.example.com/v1',
+        model: 'deepseek-chat',
+        timeoutMs: '30000',
+        enabled: false,
+        apiKeyConfigured: true,
+      })
+    })
+
+    it('supports explicitly clearing or replacing the masked api key state', () => {
+      const cleared = computeBridgeModelConfigState({
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        timeoutMs: '20000',
+        enabled: false,
+        apiKeyConfigured: true,
+      }, {
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        timeoutMs: '',
+        enabled: false,
+        apiKeyValue: '',
+        clearApiKey: true,
+      })
+
+      const replaced = computeBridgeModelConfigState(cleared, {
+        provider: 'openai-compatible',
+        baseUrl: '',
+        model: '',
+        timeoutMs: '',
+        enabled: true,
+        apiKeyValue: 'new-key',
+        clearApiKey: false,
+      })
+
+      expect(cleared.apiKeyConfigured).toBe(false)
+      expect(cleared.timeoutMs).toBe('20000')
+      expect(replaced.apiKeyConfigured).toBe(true)
+      expect(replaced.enabled).toBe(true)
     })
   })
 })

@@ -268,6 +268,41 @@ export function deriveBridgeConsoleRoute (
   }
 }
 
+export interface BridgeModelConfigState {
+  provider: string
+  baseUrl: string
+  model: string
+  timeoutMs: string
+  enabled: boolean
+  apiKeyConfigured: boolean
+}
+
+export interface BridgeModelConfigSubmission {
+  provider: string
+  baseUrl: string
+  model: string
+  timeoutMs: string
+  enabled: boolean
+  apiKeyValue: string
+  clearApiKey: boolean
+}
+
+export function computeBridgeModelConfigState (
+  current: BridgeModelConfigState,
+  submission: BridgeModelConfigSubmission,
+): BridgeModelConfigState {
+  const apiKeyValue = submission.apiKeyValue.trim()
+  return {
+    ...current,
+    provider: submission.provider,
+    baseUrl: submission.baseUrl.trim(),
+    model: submission.model.trim(),
+    timeoutMs: submission.timeoutMs.trim() || '20000',
+    enabled: submission.enabled,
+    apiKeyConfigured: submission.clearApiKey ? false : (apiKeyValue !== '' || current.apiKeyConfigured),
+  }
+}
+
 function renderPage (tokenRequired: boolean): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -835,6 +870,7 @@ function renderPage (tokenRequired: boolean): string {
     const productName = 'AI企微客户运营'
     const bootstrap = { tokenRequired: ${tokenRequired ? 'true' : 'false'} }
     const pageAliases = ${JSON.stringify(BRIDGE_CONSOLE_ROUTE_ALIASES)}
+    const computeNextModelConfigState = ${computeBridgeModelConfigState.toString()}
     const permissionDescriptors = [
       { key: 'manageModels', labelId: 'perm-models' },
       { key: 'managePeople', labelId: 'perm-people' },
@@ -1542,16 +1578,15 @@ function renderPage (tokenRequired: boolean): string {
 
     elements.modelConfigForm.addEventListener('submit', (event) => {
       event.preventDefault()
-      modelConfigState.provider = elements.modelProvider.value
-      modelConfigState.baseUrl = elements.modelBaseUrl.value.trim()
-      modelConfigState.model = elements.modelName.value.trim()
-      modelConfigState.timeoutMs = elements.modelTimeout.value.trim() || '20000'
-      modelConfigState.enabled = elements.modelEnabled.checked
-      if (elements.modelClearApiKey.checked) {
-        modelConfigState.apiKeyConfigured = false
-      } else if (elements.modelApiKey.value.trim() !== '') {
-        modelConfigState.apiKeyConfigured = true
-      }
+      Object.assign(modelConfigState, computeNextModelConfigState(modelConfigState, {
+        provider: elements.modelProvider.value,
+        baseUrl: elements.modelBaseUrl.value,
+        model: elements.modelName.value,
+        timeoutMs: elements.modelTimeout.value,
+        enabled: elements.modelEnabled.checked,
+        apiKeyValue: elements.modelApiKey.value,
+        clearApiKey: elements.modelClearApiKey.checked,
+      }))
       elements.modelApiKey.value = ''
       renderModelConfigState('已保存到当前页面内存状态；仓库尚未接入持久化模型配置 API，API Key 未回显。')
     })
@@ -1565,10 +1600,10 @@ function renderPage (tokenRequired: boolean): string {
       const route = deriveRouteState()
       setActiveToolGroup(route.toolGroup)
       setActivePage(route.page, { updateHash: false, focus: focusPageTitle })
-      if (route.scrollToAssets) {
+      if (focusPageTitle && route.scrollToAssets) {
         const assetSection = document.getElementById('tools-assets-section')
         if (assetSection) {
-          assetSection.scrollIntoView({ block: 'start', behavior: 'smooth' })
+          assetSection.scrollIntoView({ block: 'start' })
         }
       }
     }
