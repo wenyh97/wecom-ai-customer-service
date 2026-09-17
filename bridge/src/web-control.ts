@@ -594,6 +594,14 @@ function renderPage (tokenRequired: boolean): string {
 
     .page { display: none; }
     .page.active { display: block; }
+    .page-section-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      line-height: 1.35;
+      font-weight: 600;
+      color: var(--muted-strong);
+      letter-spacing: 0.01em;
+    }
     .grid { display: grid; gap: var(--space-3); }
     .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -833,6 +841,7 @@ function renderPage (tokenRequired: boolean): string {
         <p id="content-notice" class="content-notice hidden" role="status" aria-live="polite"></p>
         <div class="content-scroll">
           <section id="page-account" class="page active" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">账号链接</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -875,6 +884,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-tools" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">工具</h2>
             <article class="card">
               <div class="section-head">
                 <h3>工具中心</h3>
@@ -938,6 +948,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-rag" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">AI 知识库（RAG）</h2>
             <article class="card">
               <div class="section-head">
                 <h3>AI 知识库（RAG）</h3>
@@ -963,6 +974,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-stats" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">数据统计</h2>
             <article class="card">
               <div class="section-head">
                 <h3>数据统计</h3>
@@ -1074,6 +1086,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-model-config" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">模型配置</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -1126,6 +1139,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-people" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">人员管理</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -1148,6 +1162,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-teams" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">团队管理</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -1170,6 +1185,7 @@ function renderPage (tokenRequired: boolean): string {
           </section>
 
           <section id="page-permissions" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">权限管理</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -1469,7 +1485,9 @@ function renderPage (tokenRequired: boolean): string {
 
     function setActivePage (pageKey, options) {
       const settings = options || {}
+      const previousPage = selectedPage
       selectedPage = normalizeRoute(pageKey)
+      const pageChanged = previousPage !== selectedPage
       if (isSettingsPage(selectedPage)) {
         settingsExpanded = true
       }
@@ -1489,12 +1507,12 @@ function renderPage (tokenRequired: boolean): string {
       }
       document.title = productName
       if (settings.focus !== false) {
-        const activePage = elements.pages.find((page) => page.id === 'page-' + selectedPage)
-        if (activePage && typeof activePage.focus === 'function') {
-          activePage.focus()
+        const activeHeading = document.querySelector('#page-' + selectedPage + ' [data-page-heading]')
+        if (activeHeading && typeof activeHeading.focus === 'function') {
+          activeHeading.focus()
         }
       }
-      if (elements.contentScroll) {
+      if (pageChanged && elements.contentScroll) {
         elements.contentScroll.scrollTop = 0
       }
     }
@@ -2068,8 +2086,17 @@ function renderPage (tokenRequired: boolean): string {
         return
       }
       showAppScreen()
-      setText(elements.bridgePhase, 'error')
-      setText(elements.bridgeMessage, message)
+      updateBridgeCards({
+        phase: 'error',
+        message,
+        lastUpdatedAt: new Date().toISOString(),
+        qrCodeSvg: null,
+        qrCodeStatus: null,
+        qrCodeUpdatedAt: null,
+        loginUser: null,
+        verifyCode: null,
+      })
+      renderStatsError(message)
       setContentNotice(message)
     })
   </script>
