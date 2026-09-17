@@ -1256,7 +1256,7 @@ function renderPage (tokenRequired: boolean): string {
       account: { title: '账号链接', subtitle: '统一管理企业微信账号绑定、扫码登录与验证码校验。' },
       tools: { title: '工具', subtitle: '运维工具已整合节日问候、产品介绍、FAQ 等扩展能力。' },
       rag: { title: 'AI 知识库（RAG）', subtitle: '保留知识库入口，检索结果与指标待后端接口接入。' },
-      stats: { title: '数据统计', subtitle: '优先展示可验证的实时状态与待接入业务统计。' },
+      stats: { title: '数据统计', subtitle: '展示渠道、会话、客户、消息与转化视图，并保留 Bridge 实时状态同步。' },
       'model-config': { title: '模型配置', subtitle: '支持编辑当前页临时配置，敏感密钥默认脱敏。' },
       people: { title: '人员管理', subtitle: '预留用户管理信息架构，待接入真实用户 API。' },
       teams: { title: '团队管理', subtitle: '预留团队协作结构，待接入真实组织 API。' },
