@@ -240,7 +240,7 @@ const BRIDGE_CONSOLE_ROUTE_ALIASES = {
 } as const
 
 type BridgeConsolePage = typeof BRIDGE_CONSOLE_ROUTE_ALIASES[keyof typeof BRIDGE_CONSOLE_ROUTE_ALIASES]
-type BridgeConsoleToolGroup = 'operations' | 'assets'
+type BridgeConsoleToolGroup = 'operations'
 
 export interface BridgeConsoleRoute {
   page: BridgeConsolePage
@@ -263,7 +263,7 @@ export function deriveBridgeConsoleRoute (
   const scrollToAssets = raw === 'assets' || raw === 'content-assets'
   return {
     page: normalizeBridgeConsolePage(raw),
-    toolGroup: scrollToAssets ? 'assets' : 'operations',
+    toolGroup: 'operations',
     scrollToAssets,
   }
 }
@@ -389,6 +389,7 @@ function renderPage (tokenRequired: boolean): string {
     .brand h1 { margin: 0; font-size: 22px; }
     .brand p { margin: 6px 0 0; color: var(--muted); }
     .nav { display: grid; gap: 8px; flex: 1; align-content: start; overflow: auto; min-height: 0; }
+    .nav-group { display: grid; gap: 8px; }
     .nav-btn {
       border: 1px solid transparent;
       border-radius: var(--radius-sm);
@@ -402,14 +403,103 @@ function renderPage (tokenRequired: boolean): string {
       gap: 8px;
     }
     .nav-btn.active { background: #fff; border-color: var(--line); color: var(--accent); font-weight: 600; }
+    .nav-parent { justify-content: space-between; }
+    .nav-label { display: inline-flex; align-items: center; gap: 8px; }
+    .nav-caret { color: var(--muted); transition: transform 0.2s ease; }
+    .nav-parent[aria-expanded="true"] .nav-caret { transform: rotate(180deg); }
+    .nav-subnav { display: grid; gap: 6px; padding-left: 12px; }
+    .nav-sub-btn {
+      padding: 8px 12px 8px 36px;
+      color: var(--muted);
+      font-size: 14px;
+    }
     .sidebar-foot {
       margin-top: auto;
       border-top: 1px solid var(--line);
       padding-top: var(--space-3);
+      position: relative;
+    }
+    .account-entry { position: relative; }
+    .account-trigger {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fff;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      text-align: left;
+      color: var(--text);
+    }
+    .account-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      flex: none;
+    }
+    .account-copy { min-width: 0; display: grid; gap: 4px; flex: 1; }
+    .account-label { font-size: 12px; color: var(--muted); }
+    .account-name {
+      font-size: 15px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .account-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--line);
+      flex: none;
+    }
+    .status-dot.online { background: var(--success); }
+    .status-dot.offline { background: var(--danger); }
+    .account-menu {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: calc(100% + 10px);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+      padding: var(--space-3);
       display: grid;
       gap: var(--space-2);
+      z-index: 20;
     }
-    .account-panel { display: grid; gap: var(--space-2); }
+    .menu-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-2);
+      font-size: 13px;
+    }
+    .menu-row strong { color: var(--text); }
+    .menu-actions {
+      display: grid;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--line);
+    }
+    .menu-btn { width: 100%; }
 
     .content {
       background: var(--panel);
@@ -452,6 +542,7 @@ function renderPage (tokenRequired: boolean): string {
     .tool-btn { width: 100%; margin-top: var(--space-3); }
     .tool-group { display: none; margin-top: 12px; }
     .tool-group.active { display: block; }
+    .tool-library-item.hidden { display: none !important; }
 
     .modal-mask {
       position: fixed;
@@ -492,11 +583,13 @@ function renderPage (tokenRequired: boolean): string {
       .page-shell { padding: var(--space-2); }
       .app { grid-template-columns: 1fr; }
       .sidebar { gap: var(--space-3); }
-      .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
-      .nav-btn { font-size: 13px; padding: 8px; justify-content: center; text-align: center; }
+      .nav { grid-template-columns: 1fr; overflow: visible; }
+      .nav-btn { font-size: 13px; padding: 8px 10px; }
+      .nav-subnav { padding-left: 0; }
+      .nav-sub-btn { padding-left: 18px; }
       .grid.two, .grid.three, .metric-grid { grid-template-columns: 1fr; }
       .topbar { flex-direction: column; align-items: flex-start; }
-      .sidebar-foot { gap: var(--space-3); }
+      .account-menu { position: static; margin-top: 8px; }
     }
   </style>
 </head>
@@ -533,18 +626,42 @@ function renderPage (tokenRequired: boolean): string {
           <button class="nav-btn" data-nav="tools" type="button">🧰 工具</button>
           <button class="nav-btn" data-nav="rag" type="button">📚 AI 知识库（RAG）</button>
           <button class="nav-btn" data-nav="stats" type="button">📊 数据统计</button>
-          <button class="nav-btn" data-nav="model-config" type="button">🤖 模型配置</button>
-          <button class="nav-btn" data-nav="people" type="button">👤 人员管理</button>
-          <button class="nav-btn" data-nav="teams" type="button">👥 团队管理</button>
-          <button class="nav-btn" data-nav="permissions" type="button">🛡️ 权限管理</button>
+          <div class="nav-group">
+            <button id="settings-nav-toggle" class="nav-btn nav-parent" type="button" aria-expanded="false" aria-controls="settings-nav-panel">
+              <span class="nav-label">⚙️ 设置</span>
+              <span class="nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div id="settings-nav-panel" class="nav-subnav hidden">
+              <button class="nav-btn nav-sub-btn" data-nav="model-config" type="button">模型配置</button>
+              <button class="nav-btn nav-sub-btn" data-nav="people" type="button">人员管理</button>
+              <button class="nav-btn nav-sub-btn" data-nav="teams" type="button">团队管理</button>
+              <button class="nav-btn nav-sub-btn" data-nav="permissions" type="button">权限管理</button>
+            </div>
+          </div>
         </nav>
         <footer class="sidebar-foot">
-          <div class="account-panel">
-            <span id="service-status" class="status-pill">服务状态：连接中</span>
-            <span class="status-pill">当前用户：admin</span>
-            <span class="status-pill">Bridge 状态：<span id="sidebar-bridge-phase">starting</span></span>
+          <div class="account-entry">
+            <button id="account-menu-trigger" class="account-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="account-menu-panel">
+              <span class="account-avatar" aria-hidden="true">A</span>
+              <span class="account-copy">
+                <span class="account-label">当前用户</span>
+                <span class="account-name">admin</span>
+                <span class="account-meta">
+                  <span id="account-status-dot" class="status-dot online" aria-hidden="true"></span>
+                  <span id="account-status-summary">服务状态：连接中</span>
+                </span>
+              </span>
+              <span class="nav-caret" aria-hidden="true">▾</span>
+            </button>
+            <div id="account-menu-panel" class="account-menu hidden" aria-label="账户菜单">
+              <div class="menu-row"><strong>当前用户</strong><span>admin</span></div>
+              <div class="menu-row"><strong>服务状态</strong><span id="service-status">连接中</span></div>
+              <div class="menu-row"><strong>Bridge 状态</strong><span id="sidebar-bridge-phase">starting</span></div>
+              <div class="menu-actions">
+                <button id="logout-btn" type="button" class="btn btn-secondary menu-btn">退出登录</button>
+              </div>
+            </div>
           </div>
-          <button id="logout-btn" type="button" class="btn btn-secondary">退出登录</button>
         </footer>
       </aside>
 
@@ -605,52 +722,57 @@ function renderPage (tokenRequired: boolean): string {
                 <h3>工具中心</h3>
                 <span class="status-pill">按能力分组访问</span>
               </div>
-              <p class="muted">内容资产已合并到工具中心，可通过分组、搜索和标签继续访问原有能力。</p>
-              <div class="tabs" aria-label="工具分组" style="margin-top: 12px;">
-                <button class="tab-btn active" data-tool-group="operations" type="button">运营工具</button>
-                <button class="tab-btn" data-tool-group="assets" type="button">内容资产</button>
-              </div>
+              <p class="muted">运维工具已收纳节日问候、产品介绍、FAQ 等常用能力，可继续通过标签、搜索和原有入口完成操作。</p>
 
               <section id="tool-group-operations" class="tool-group active">
-                <div class="grid three">
-                  <article class="card"><h3>👋 欢迎语</h3><p>根据客户标签生成开场话术。</p><button class="btn btn-secondary tool-btn" data-tool="欢迎语" type="button">查看能力</button></article>
-                  <article class="card"><h3>⏰ 定时推送</h3><p>设置节奏化客户触达任务。</p><button class="btn btn-secondary tool-btn" data-tool="定时推送" type="button">查看能力</button></article>
-                  <article class="card"><h3>⚡ 快捷回复</h3><p>常见场景一键引用回复。</p><button class="btn btn-secondary tool-btn" data-tool="快捷回复" type="button">查看能力</button></article>
-                  <article class="card"><h3>🧾 会话记录</h3><p>按客户查看沟通摘要与跟进重点。</p><button class="btn btn-secondary tool-btn" data-tool="会话记录" type="button">查看能力</button></article>
-                  <article class="card"><h3>🧠 AI 客户画像分析</h3><p>识别客户意向、偏好和生命周期。</p><button class="btn btn-secondary tool-btn" data-tool="AI 客户画像分析" type="button">查看能力</button></article>
-                  <article class="card"><h3>📈 AI 老客维护策略推荐</h3><p>提供复购、关怀和沉睡唤醒建议。</p><button class="btn btn-secondary tool-btn" data-tool="AI 老客维护策略推荐" type="button">查看能力</button></article>
-                </div>
-              </section>
-
-              <section id="tool-group-assets" class="tool-group" aria-labelledby="asset-search" style="margin-top: 16px;">
-                <div class="card" id="tools-assets-section">
+                <div class="card">
                   <div class="section-head">
-                    <h3>内容资产</h3>
-                    <span class="status-pill">已并入工具中心</span>
+                    <h3>运维工具</h3>
+                    <span class="status-pill">核心运营动作</span>
                   </div>
-                  <input id="asset-search" class="input" type="search" placeholder="搜索模板或标签，如：节日 / FAQ">
-                  <div id="asset-list" class="grid two" style="margin-top: 12px;">
-                    <article class="card asset-item" data-title="欢迎语模板" data-tags="欢迎 新客 开场">
+                  <div class="grid three">
+                    <article class="card"><h3>👋 欢迎语</h3><p>根据客户标签生成开场话术。</p><button class="btn btn-secondary tool-btn" data-tool="欢迎语" type="button">查看能力</button></article>
+                    <article class="card"><h3>⏰ 定时推送</h3><p>设置节奏化客户触达任务。</p><button class="btn btn-secondary tool-btn" data-tool="定时推送" type="button">查看能力</button></article>
+                    <article class="card"><h3>⚡ 快捷回复</h3><p>常见场景一键引用回复。</p><button class="btn btn-secondary tool-btn" data-tool="快捷回复" type="button">查看能力</button></article>
+                    <article class="card"><h3>🧾 会话记录</h3><p>按客户查看沟通摘要与跟进重点。</p><button class="btn btn-secondary tool-btn" data-tool="会话记录" type="button">查看能力</button></article>
+                    <article class="card"><h3>🧠 AI 客户画像分析</h3><p>识别客户意向、偏好和生命周期。</p><button class="btn btn-secondary tool-btn" data-tool="AI 客户画像分析" type="button">查看能力</button></article>
+                    <article class="card"><h3>📈 AI 老客维护策略推荐</h3><p>提供复购、关怀和沉睡唤醒建议。</p><button class="btn btn-secondary tool-btn" data-tool="AI 老客维护策略推荐" type="button">查看能力</button></article>
+                  </div>
+                </div>
+                <div id="tool-library-section" class="card" style="margin-top: 16px;">
+                  <div class="section-head">
+                    <h3>常用素材</h3>
+                    <span class="status-pill">运维工具子功能</span>
+                  </div>
+                  <p class="muted">原有模板和问答能力已移动到运维工具下，入口与搜索方式保持可用。</p>
+                  <input id="tool-library-search" class="input" type="search" placeholder="搜索模板或标签，如：节日 / FAQ">
+                  <div id="tool-library-list" class="grid two" style="margin-top: 12px;">
+                    <article class="card tool-library-item" data-title="欢迎语模板" data-tags="欢迎 新客 开场">
                       <h3>欢迎语模板</h3>
                       <p>用于首次触达新客户的标准开场。</p>
                       <div class="tags"><span class="tag">欢迎</span><span class="tag">新客</span></div>
+                      <button class="btn btn-secondary tool-btn" data-tool="欢迎语模板" type="button">查看能力</button>
                     </article>
-                    <article class="card asset-item" data-title="节日问候" data-tags="节日 关怀 活动">
+                    <article class="card tool-library-item" data-title="节日问候" data-tags="节日 关怀 活动">
                       <h3>节日问候</h3>
                       <p>中秋、国庆等节日场景模板集合。</p>
                       <div class="tags"><span class="tag">节日</span><span class="tag">关怀</span></div>
+                      <button class="btn btn-secondary tool-btn" data-tool="节日问候" type="button">查看能力</button>
                     </article>
-                    <article class="card asset-item" data-title="产品介绍" data-tags="产品 卖点 话术">
+                    <article class="card tool-library-item" data-title="产品介绍" data-tags="产品 卖点 话术">
                       <h3>产品介绍</h3>
                       <p>核心产品卖点与常见提问答复。</p>
                       <div class="tags"><span class="tag">产品</span><span class="tag">卖点</span></div>
+                      <button class="btn btn-secondary tool-btn" data-tool="产品介绍" type="button">查看能力</button>
                     </article>
-                    <article class="card asset-item" data-title="FAQ" data-tags="FAQ 问答 客服">
+                    <article class="card tool-library-item" data-title="FAQ" data-tags="FAQ 问答 客服">
                       <h3>FAQ</h3>
                       <p>高频问题的统一回答示例。</p>
                       <div class="tags"><span class="tag">FAQ</span><span class="tag">客服</span></div>
+                      <button class="btn btn-secondary tool-btn" data-tool="FAQ" type="button">查看能力</button>
                     </article>
                   </div>
+                  <div id="tool-library-empty" class="empty-box hidden" style="margin-top: 12px;">没有匹配的运维素材，请更换关键词后重试。</div>
                 </div>
               </section>
             </article>
@@ -907,10 +1029,11 @@ function renderPage (tokenRequired: boolean): string {
     let activeToolGroup = 'operations'
     let lastToolTrigger = null
     let reconnectTimer = null
+    let settingsExpanded = false
 
     const pageMeta = {
       account: { title: '账号链接', subtitle: '统一管理企业微信账号绑定、扫码登录与验证码校验。' },
-      tools: { title: '工具', subtitle: '内容资产已合并到工具中心，可按分组继续访问原有能力。' },
+      tools: { title: '工具', subtitle: '运维工具已收纳节日问候、产品介绍、FAQ 等常用能力。' },
       rag: { title: 'AI 知识库（RAG）', subtitle: '保留知识库入口，检索结果与指标待后端接口接入。' },
       stats: { title: '数据统计', subtitle: '优先展示可验证的实时状态与待接入业务统计。' },
       'model-config': { title: '模型配置', subtitle: '支持编辑当前页临时配置，敏感密钥默认脱敏。' },
@@ -926,6 +1049,10 @@ function renderPage (tokenRequired: boolean): string {
       '会话记录': '展示客户会话摘要和重点跟进建议。',
       'AI 客户画像分析': '基于互动行为生成客户偏好与意向等级。',
       'AI 老客维护策略推荐': '针对老客户生命周期给出分层维护策略。',
+      '欢迎语模板': '保留原有模板入口，用于首次触达新客户的标准开场。',
+      '节日问候': '覆盖常见节日关怀与活动通知场景的话术模板。',
+      '产品介绍': '集中展示核心卖点、产品资料与常见讲解话术。',
+      FAQ: '沉淀高频问题与统一答复口径，便于客服快速引用。',
     }
 
     const elements = {
@@ -938,9 +1065,16 @@ function renderPage (tokenRequired: boolean): string {
       loginError: document.getElementById('login-error'),
       pageTitle: document.getElementById('page-title'),
       pageSubtitle: document.getElementById('page-subtitle'),
+      settingsNavToggle: document.getElementById('settings-nav-toggle'),
+      settingsNavPanel: document.getElementById('settings-nav-panel'),
       navButtons: Array.from(document.querySelectorAll('.nav-btn')),
+      settingsNavItems: Array.from(document.querySelectorAll('.nav-sub-btn')),
       pages: Array.from(document.querySelectorAll('.page')),
       logoutBtn: document.getElementById('logout-btn'),
+      accountMenuTrigger: document.getElementById('account-menu-trigger'),
+      accountMenuPanel: document.getElementById('account-menu-panel'),
+      accountStatusDot: document.getElementById('account-status-dot'),
+      accountStatusSummary: document.getElementById('account-status-summary'),
       serviceStatus: document.getElementById('service-status'),
       sidebarBridgePhase: document.getElementById('sidebar-bridge-phase'),
       bridgePhase: document.getElementById('bridge-phase'),
@@ -959,8 +1093,9 @@ function renderPage (tokenRequired: boolean): string {
       accountBoundUser: document.getElementById('account-bound-user'),
       accountLastUpdated: document.getElementById('account-last-updated'),
       accountNextStep: document.getElementById('account-next-step'),
-      assetSearch: document.getElementById('asset-search'),
-      assetItems: Array.from(document.querySelectorAll('.asset-item')),
+      toolLibrarySearch: document.getElementById('tool-library-search'),
+      toolLibraryEmpty: document.getElementById('tool-library-empty'),
+      toolLibraryItems: Array.from(document.querySelectorAll('.tool-library-item')),
       toolButtons: Array.from(document.querySelectorAll('.tool-btn[data-tool]')),
       toolGroupButtons: Array.from(document.querySelectorAll('[data-tool-group]')),
       toolGroups: Array.from(document.querySelectorAll('.tool-group')),
@@ -1042,6 +1177,25 @@ function renderPage (tokenRequired: boolean): string {
       setHidden(elements.appScreen, false)
     }
 
+    function setAccountMenuOpen (open) {
+      setHidden(elements.accountMenuPanel, !open)
+      elements.accountMenuTrigger.setAttribute('aria-expanded', open ? 'true' : 'false')
+    }
+
+    function isSettingsPage (pageKey) {
+      return ['model-config', 'people', 'teams', 'permissions'].includes(pageKey)
+    }
+
+    function syncSettingsNavigation () {
+      const expanded = isSettingsPage(selectedPage) || settingsExpanded
+      elements.settingsNavToggle.classList.toggle('active', expanded)
+      elements.settingsNavToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
+      setHidden(elements.settingsNavPanel, !expanded)
+      elements.settingsNavItems.forEach((button) => {
+        button.classList.toggle('active', button.dataset.nav === selectedPage)
+      })
+    }
+
     function normalizeRoute (raw) {
       const clean = String(raw || '').trim().replace(/^#+/, '').toLowerCase()
       return pageAliases[clean] || 'account'
@@ -1053,13 +1207,13 @@ function renderPage (tokenRequired: boolean): string {
       const raw = hashValue || queryValue || 'account'
       return {
         page: normalizeRoute(raw),
-        toolGroup: (raw === 'assets' || raw === 'content-assets') ? 'assets' : 'operations',
+        toolGroup: 'operations',
         scrollToAssets: raw === 'assets' || raw === 'content-assets',
       }
     }
 
     function setActiveToolGroup (groupKey) {
-      activeToolGroup = groupKey === 'assets' ? 'assets' : 'operations'
+      activeToolGroup = 'operations'
       elements.toolGroupButtons.forEach((button) => {
         button.classList.toggle('active', button.dataset.toolGroup === activeToolGroup)
       })
@@ -1069,10 +1223,6 @@ function renderPage (tokenRequired: boolean): string {
     }
 
     function syncLocationHash () {
-      if (selectedPage === 'tools' && activeToolGroup === 'assets') {
-        window.location.hash = 'assets'
-        return
-      }
       window.location.hash = selectedPage
     }
 
@@ -1088,6 +1238,8 @@ function renderPage (tokenRequired: boolean): string {
       elements.pages.forEach((page) => {
         page.classList.toggle('active', page.id === 'page-' + selectedPage)
       })
+      syncSettingsNavigation()
+      setAccountMenuOpen(false)
       if (settings.updateHash !== false) {
         syncLocationHash()
       }
@@ -1205,6 +1357,7 @@ function renderPage (tokenRequired: boolean): string {
     }
 
     function updateBridgeCards (status) {
+      const phaseLabel = getPhaseLabel(status)
       setText(elements.bridgePhase, status.phase)
       setText(elements.sidebarBridgePhase, status.phase)
       setText(elements.bridgeMessage, status.message)
@@ -1214,7 +1367,10 @@ function renderPage (tokenRequired: boolean): string {
         ? '-'
         : [status.loginUser.name, status.loginUser.id].filter(Boolean).join(' / ') || '-'
       setText(elements.bridgeLoginUser, loginUser)
-      setText(elements.serviceStatus, '服务状态：' + getPhaseLabel(status))
+      setText(elements.serviceStatus, phaseLabel)
+      setText(elements.accountStatusSummary, '服务状态：' + phaseLabel + ' · Bridge：' + status.phase)
+      elements.accountStatusDot.classList.toggle('online', phaseLabel === '在线')
+      elements.accountStatusDot.classList.toggle('offline', phaseLabel !== '在线')
       updateAccountSummary(status)
 
       const signature = JSON.stringify({
@@ -1375,18 +1531,21 @@ function renderPage (tokenRequired: boolean): string {
     }
 
     elements.navButtons.forEach((button) => {
+      if (!button.dataset.nav) {
+        return
+      }
       button.addEventListener('click', () => {
-        setActivePage(button.dataset.nav || 'account')
+        setActivePage(button.dataset.nav)
       })
     })
 
-    elements.toolGroupButtons.forEach((button) => {
-      button.addEventListener('click', () => {
-        setActiveToolGroup(button.dataset.toolGroup || 'operations')
-        if (selectedPage === 'tools') {
-          syncLocationHash()
-        }
-      })
+    elements.settingsNavToggle.addEventListener('click', () => {
+      if (isSettingsPage(selectedPage)) {
+        settingsExpanded = true
+      } else {
+        settingsExpanded = !settingsExpanded
+      }
+      syncSettingsNavigation()
     })
 
     elements.loginForm.addEventListener('submit', async (event) => {
@@ -1424,6 +1583,7 @@ function renderPage (tokenRequired: boolean): string {
       manualLoggedOut = true
       csrfToken = null
       latestRequestId = null
+      setAccountMenuOpen(false)
       elements.loginPassword.value = ''
       setVerifyFeedback('', '')
       setLoginError('')
@@ -1488,14 +1648,20 @@ function renderPage (tokenRequired: boolean): string {
       }
     })
 
-    elements.assetSearch.addEventListener('input', () => {
-      const keyword = elements.assetSearch.value.trim().toLowerCase()
-      elements.assetItems.forEach((item) => {
+    elements.toolLibrarySearch.addEventListener('input', () => {
+      const keyword = elements.toolLibrarySearch.value.trim().toLowerCase()
+      let visibleCount = 0
+      elements.toolLibraryItems.forEach((item) => {
         const title = item.dataset.title ?? ''
         const tags = item.dataset.tags ?? ''
         const text = (title + ' ' + tags).toLowerCase()
-        item.classList.toggle('hidden', keyword !== '' && !text.includes(keyword))
+        const hidden = keyword !== '' && !text.includes(keyword)
+        item.classList.toggle('hidden', hidden)
+        if (!hidden) {
+          visibleCount += 1
+        }
       })
+      setHidden(elements.toolLibraryEmpty, visibleCount !== 0)
     })
 
     function openToolModal (name, triggerButton) {
@@ -1555,6 +1721,10 @@ function renderPage (tokenRequired: boolean): string {
       if (event.key === 'Escape' && !elements.toolModalMask.classList.contains('hidden')) {
         closeToolModal()
       }
+      if (event.key === 'Escape' && !elements.accountMenuPanel.classList.contains('hidden')) {
+        setAccountMenuOpen(false)
+        elements.accountMenuTrigger.focus()
+      }
     })
 
     function setRagFeedback (text) {
@@ -1610,11 +1780,11 @@ function renderPage (tokenRequired: boolean): string {
       setActiveToolGroup(route.toolGroup)
       setActivePage(route.page, { updateHash: false, focus: focusPageTitle && !route.scrollToAssets })
       if (focusPageTitle && route.scrollToAssets) {
-        const assetSection = document.getElementById('tools-assets-section')
-        if (assetSection) {
-          assetSection.scrollIntoView({ block: 'start' })
+        const toolLibrarySection = document.getElementById('tool-library-section')
+        if (toolLibrarySection) {
+          toolLibrarySection.scrollIntoView({ block: 'start' })
         }
-        elements.assetSearch.focus()
+        elements.toolLibrarySearch.focus()
       }
     }
 
@@ -1623,6 +1793,17 @@ function renderPage (tokenRequired: boolean): string {
     })
     window.addEventListener('popstate', () => {
       applyRouteState(true)
+    })
+    document.addEventListener('click', (event) => {
+      if (!elements.accountMenuPanel.classList.contains('hidden')
+        && !elements.accountMenuPanel.contains(event.target)
+        && !elements.accountMenuTrigger.contains(event.target)) {
+        setAccountMenuOpen(false)
+      }
+    })
+    elements.accountMenuTrigger.addEventListener('click', () => {
+      const expanded = elements.accountMenuTrigger.getAttribute('aria-expanded') === 'true'
+      setAccountMenuOpen(!expanded)
     })
 
     applyPermissionGuards()
@@ -1637,7 +1818,10 @@ function renderPage (tokenRequired: boolean): string {
         return
       }
       showAppScreen()
-      setText(elements.serviceStatus, '服务状态：初始化失败')
+      setText(elements.serviceStatus, '初始化失败')
+      setText(elements.accountStatusSummary, '服务状态：初始化失败 · Bridge：error')
+      elements.accountStatusDot.classList.remove('online')
+      elements.accountStatusDot.classList.add('offline')
       setText(elements.pageSubtitle, message)
     })
   </script>
