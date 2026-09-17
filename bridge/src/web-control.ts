@@ -303,6 +303,40 @@ export function computeBridgeModelConfigState (
   }
 }
 
+export interface BridgeToolLibraryItem {
+  title: string
+  tags: string
+}
+
+export interface BridgeToolLibraryFilterState {
+  empty: boolean
+  statusText: string
+  visibleIndexes: number[]
+}
+
+export function computeBridgeToolLibraryFilterState (
+  items: BridgeToolLibraryItem[],
+  keyword: string,
+): BridgeToolLibraryFilterState {
+  const normalizedKeyword = keyword.trim().toLowerCase()
+  const visibleIndexes = items.reduce<number[]>((result, item, index) => {
+    const haystack = `${item.title} ${item.tags}`.trim().toLowerCase()
+    if (normalizedKeyword === '' || haystack.includes(normalizedKeyword)) {
+      result.push(index)
+    }
+    return result
+  }, [])
+  return {
+    empty: visibleIndexes.length === 0,
+    statusText: visibleIndexes.length === 0
+      ? '没有匹配的运维素材，请更换关键词后重试。'
+      : (normalizedKeyword === ''
+          ? `展示 ${visibleIndexes.length} 条运维素材。`
+          : `找到 ${visibleIndexes.length} 条与当前关键词相关的运维素材。`),
+    visibleIndexes,
+  }
+}
+
 function renderPage (tokenRequired: boolean): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -407,7 +441,7 @@ function renderPage (tokenRequired: boolean): string {
     .nav-label { display: inline-flex; align-items: center; gap: 8px; }
     .nav-caret { color: var(--muted); transition: transform 0.2s ease; }
     .nav-parent[aria-expanded="true"] .nav-caret { transform: rotate(180deg); }
-    .nav-subnav { display: grid; gap: 6px; padding-left: 12px; }
+    .nav-subnav { display: grid; gap: 6px; padding: 0 0 0 12px; margin: 0; list-style: none; }
     .nav-sub-btn {
       padding: 8px 12px 8px 36px;
       color: var(--muted);
@@ -631,31 +665,31 @@ function renderPage (tokenRequired: boolean): string {
               <span class="nav-label">⚙️ 设置</span>
               <span class="nav-caret" aria-hidden="true">▾</span>
             </button>
-            <div id="settings-nav-panel" class="nav-subnav hidden">
-              <button class="nav-btn nav-sub-btn" data-nav="model-config" type="button">模型配置</button>
-              <button class="nav-btn nav-sub-btn" data-nav="people" type="button">人员管理</button>
-              <button class="nav-btn nav-sub-btn" data-nav="teams" type="button">团队管理</button>
-              <button class="nav-btn nav-sub-btn" data-nav="permissions" type="button">权限管理</button>
-            </div>
+            <ul id="settings-nav-panel" class="nav-subnav hidden" aria-label="设置子导航">
+              <li><button class="nav-btn nav-sub-btn" data-nav="model-config" type="button">模型配置</button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="people" type="button">人员管理</button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="teams" type="button">团队管理</button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="permissions" type="button">权限管理</button></li>
+            </ul>
           </div>
         </nav>
         <footer class="sidebar-foot">
           <div class="account-entry">
-            <button id="account-menu-trigger" class="account-trigger" type="button" aria-expanded="false" aria-haspopup="true" aria-controls="account-menu-panel">
+            <button id="account-menu-trigger" class="account-trigger" type="button" aria-expanded="false" aria-controls="account-menu-panel">
               <span class="account-avatar" aria-hidden="true">A</span>
               <span class="account-copy">
                 <span class="account-label">当前用户</span>
                 <span class="account-name">admin</span>
                 <span class="account-meta">
-                  <span id="account-status-dot" class="status-dot online" aria-hidden="true"></span>
-                  <span id="account-status-summary">服务状态：连接中</span>
+                  <span id="account-status-dot" class="status-dot offline" aria-hidden="true"></span>
+                  <span id="account-status-summary">服务状态：启动中 · Bridge：starting</span>
                 </span>
               </span>
               <span class="nav-caret" aria-hidden="true">▾</span>
             </button>
             <div id="account-menu-panel" class="account-menu hidden" aria-label="账户菜单">
               <div class="menu-row"><strong>当前用户</strong><span>admin</span></div>
-              <div class="menu-row"><strong>服务状态</strong><span id="service-status">连接中</span></div>
+              <div class="menu-row"><strong>服务状态</strong><span id="service-status">启动中</span></div>
               <div class="menu-row"><strong>Bridge 状态</strong><span id="sidebar-bridge-phase">starting</span></div>
               <div class="menu-actions">
                 <button id="logout-btn" type="button" class="btn btn-secondary menu-btn">退出登录</button>
@@ -746,6 +780,7 @@ function renderPage (tokenRequired: boolean): string {
                   </div>
                   <p class="muted">原有模板和问答能力已移动到运维工具下，入口与搜索方式保持可用。</p>
                   <input id="tool-library-search" class="input" type="search" placeholder="搜索模板或标签，如：节日 / FAQ">
+                  <p id="tool-library-status" class="muted" role="status" aria-live="polite" style="margin-top: 12px;">展示 4 条运维素材。</p>
                   <div id="tool-library-list" class="grid two" style="margin-top: 12px;">
                     <article class="card tool-library-item" data-title="欢迎语模板" data-tags="欢迎 新客 开场">
                       <h3>欢迎语模板</h3>
@@ -993,6 +1028,7 @@ function renderPage (tokenRequired: boolean): string {
     const bootstrap = { tokenRequired: ${tokenRequired ? 'true' : 'false'} }
     const pageAliases = ${JSON.stringify(BRIDGE_CONSOLE_ROUTE_ALIASES)}
     const computeNextModelConfigState = ${computeBridgeModelConfigState.toString()}
+    const computeToolLibraryFilterState = ${computeBridgeToolLibraryFilterState.toString()}
     const permissionDescriptors = [
       { key: 'manageModels', labelId: 'perm-models' },
       { key: 'managePeople', labelId: 'perm-people' },
@@ -1094,6 +1130,7 @@ function renderPage (tokenRequired: boolean): string {
       accountLastUpdated: document.getElementById('account-last-updated'),
       accountNextStep: document.getElementById('account-next-step'),
       toolLibrarySearch: document.getElementById('tool-library-search'),
+      toolLibraryStatus: document.getElementById('tool-library-status'),
       toolLibraryEmpty: document.getElementById('tool-library-empty'),
       toolLibraryItems: Array.from(document.querySelectorAll('.tool-library-item')),
       toolButtons: Array.from(document.querySelectorAll('.tool-btn[data-tool]')),
@@ -1182,13 +1219,24 @@ function renderPage (tokenRequired: boolean): string {
       elements.accountMenuTrigger.setAttribute('aria-expanded', open ? 'true' : 'false')
     }
 
+    function focusAccountMenuAction () {
+      elements.logoutBtn.focus()
+    }
+
+    function openAccountMenu (focusAction = false) {
+      setAccountMenuOpen(true)
+      if (focusAction) {
+        focusAccountMenuAction()
+      }
+    }
+
     function isSettingsPage (pageKey) {
       return ['model-config', 'people', 'teams', 'permissions'].includes(pageKey)
     }
 
     function syncSettingsNavigation () {
-      const expanded = isSettingsPage(selectedPage) || settingsExpanded
-      elements.settingsNavToggle.classList.toggle('active', expanded)
+      const expanded = settingsExpanded
+      elements.settingsNavToggle.classList.toggle('active', isSettingsPage(selectedPage) || expanded)
       elements.settingsNavToggle.setAttribute('aria-expanded', expanded ? 'true' : 'false')
       setHidden(elements.settingsNavPanel, !expanded)
       elements.settingsNavItems.forEach((button) => {
@@ -1229,6 +1277,9 @@ function renderPage (tokenRequired: boolean): string {
     function setActivePage (pageKey, options) {
       const settings = options || {}
       selectedPage = normalizeRoute(pageKey)
+      if (isSettingsPage(selectedPage)) {
+        settingsExpanded = true
+      }
       const meta = pageMeta[selectedPage] || pageMeta.account
       setText(elements.pageTitle, meta.title)
       setText(elements.pageSubtitle, meta.subtitle)
@@ -1540,11 +1591,7 @@ function renderPage (tokenRequired: boolean): string {
     })
 
     elements.settingsNavToggle.addEventListener('click', () => {
-      if (isSettingsPage(selectedPage)) {
-        settingsExpanded = true
-      } else {
-        settingsExpanded = !settingsExpanded
-      }
+      settingsExpanded = !settingsExpanded
       syncSettingsNavigation()
     })
 
@@ -1649,19 +1696,19 @@ function renderPage (tokenRequired: boolean): string {
     })
 
     elements.toolLibrarySearch.addEventListener('input', () => {
-      const keyword = elements.toolLibrarySearch.value.trim().toLowerCase()
-      let visibleCount = 0
-      elements.toolLibraryItems.forEach((item) => {
-        const title = item.dataset.title ?? ''
-        const tags = item.dataset.tags ?? ''
-        const text = (title + ' ' + tags).toLowerCase()
-        const hidden = keyword !== '' && !text.includes(keyword)
+      const filterState = computeToolLibraryFilterState(
+        elements.toolLibraryItems.map((item) => ({
+          title: item.dataset.title ?? '',
+          tags: item.dataset.tags ?? '',
+        })),
+        elements.toolLibrarySearch.value,
+      )
+      elements.toolLibraryItems.forEach((item, index) => {
+        const hidden = !filterState.visibleIndexes.includes(index)
         item.classList.toggle('hidden', hidden)
-        if (!hidden) {
-          visibleCount += 1
-        }
       })
-      setHidden(elements.toolLibraryEmpty, visibleCount !== 0)
+      setHidden(elements.toolLibraryEmpty, !filterState.empty)
+      setText(elements.toolLibraryStatus, filterState.statusText)
     })
 
     function openToolModal (name, triggerButton) {
@@ -1795,6 +1842,9 @@ function renderPage (tokenRequired: boolean): string {
       applyRouteState(true)
     })
     document.addEventListener('click', (event) => {
+      if (!(event.target instanceof Node)) {
+        return
+      }
       if (!elements.accountMenuPanel.classList.contains('hidden')
         && !elements.accountMenuPanel.contains(event.target)
         && !elements.accountMenuTrigger.contains(event.target)) {
@@ -1803,7 +1853,18 @@ function renderPage (tokenRequired: boolean): string {
     })
     elements.accountMenuTrigger.addEventListener('click', () => {
       const expanded = elements.accountMenuTrigger.getAttribute('aria-expanded') === 'true'
-      setAccountMenuOpen(!expanded)
+      if (expanded) {
+        setAccountMenuOpen(false)
+        return
+      }
+      openAccountMenu()
+    })
+    elements.accountMenuTrigger.addEventListener('keydown', (event) => {
+      if (event.key !== 'ArrowDown') {
+        return
+      }
+      event.preventDefault()
+      openAccountMenu(true)
     })
 
     applyPermissionGuards()

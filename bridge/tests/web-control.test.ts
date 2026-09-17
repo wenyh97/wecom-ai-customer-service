@@ -5,6 +5,7 @@ import http from 'node:http'
 import type { BridgeLogger } from '../src/service'
 import {
   BridgeWebControlPlane,
+  computeBridgeToolLibraryFilterState,
   computeBridgeModelConfigState,
   deriveBridgeConsoleRoute,
   normalizeBridgeConsolePage,
@@ -489,6 +490,39 @@ describe('bridge console routing helpers', () => {
       expect(cleared.timeoutMs).toBe('20000')
       expect(replaced.apiKeyConfigured).toBe(true)
       expect(replaced.enabled).toBe(true)
+    })
+  })
+
+  describe('bridge tool library helpers', () => {
+    const libraryItems = [
+      { title: '欢迎语模板', tags: '欢迎 新客 开场' },
+      { title: '节日问候', tags: '节日 关怀 活动' },
+      { title: '产品介绍', tags: '产品 卖点 话术' },
+      { title: 'FAQ', tags: 'FAQ 问答 客服' },
+    ]
+
+    it('shows all items and the default status when the keyword is empty', () => {
+      expect(computeBridgeToolLibraryFilterState(libraryItems, '')).toEqual({
+        empty: false,
+        statusText: '展示 4 条运维素材。',
+        visibleIndexes: [0, 1, 2, 3],
+      })
+    })
+
+    it('filters matches and reports the matching count', () => {
+      expect(computeBridgeToolLibraryFilterState(libraryItems, '节日')).toEqual({
+        empty: false,
+        statusText: '找到 1 条与当前关键词相关的运维素材。',
+        visibleIndexes: [1],
+      })
+    })
+
+    it('reports an empty state when nothing matches', () => {
+      expect(computeBridgeToolLibraryFilterState(libraryItems, '不存在')).toEqual({
+        empty: true,
+        statusText: '没有匹配的运维素材，请更换关键词后重试。',
+        visibleIndexes: [],
+      })
     })
   })
 })
