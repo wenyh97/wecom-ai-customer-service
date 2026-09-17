@@ -2086,16 +2086,18 @@ function renderPage (tokenRequired: boolean): string {
         return
       }
       showAppScreen()
-      updateBridgeCards({
-        phase: 'error',
-        message,
-        lastUpdatedAt: new Date().toISOString(),
-        qrCodeSvg: null,
-        qrCodeStatus: null,
-        qrCodeUpdatedAt: null,
-        loginUser: null,
-        verifyCode: null,
-      })
+      if (!statsState.initialized) {
+        updateBridgeCards({
+          phase: 'error',
+          message,
+          lastUpdatedAt: new Date().toISOString(),
+          qrCodeSvg: null,
+          qrCodeStatus: null,
+          qrCodeUpdatedAt: null,
+          loginUser: null,
+          verifyCode: null,
+        })
+      }
       renderStatsError(message)
       setContentNotice(message)
     })
