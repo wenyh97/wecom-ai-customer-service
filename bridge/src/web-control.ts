@@ -1506,7 +1506,7 @@ function renderPage (tokenRequired: boolean): string {
         syncLocationHash()
       }
       document.title = productName
-      if (pageChanged || settings.focus !== false) {
+      if (pageChanged || settings.focus === true) {
         const activeHeading = document.querySelector('#page-' + selectedPage + ' [data-page-heading]')
         if (activeHeading && typeof activeHeading.focus === 'function') {
           activeHeading.focus()
