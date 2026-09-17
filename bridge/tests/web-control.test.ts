@@ -205,15 +205,18 @@ describe('BridgeWebControlPlane', () => {
     expect(html).toContain('会话记录')
     expect(html).toContain('AI 客户画像分析')
     expect(html).toContain('AI 老客维护策略推荐')
-    expect(html).toContain('常用素材')
+    expect(html).toContain('AI企微客户运营中台')
+    expect(html).toContain('运维扩展入口')
     expect(html).toContain('节日问候')
     expect(html).toContain('产品介绍')
     expect(html).toContain('FAQ')
     expect(html).toContain('连接状态（保留真实 Bridge 能力）')
-    expect(html).toContain('运维工具已收纳节日问候、产品介绍、FAQ 等常用能力')
+    expect(html).toContain('运维工具已整合节日问候、产品介绍、FAQ 等扩展能力')
     expect(html).toContain('id="account-menu-trigger"')
     expect(html).toContain('id="settings-nav-toggle"')
-    expect(html).toContain('业务统计接入状态')
+    expect(html).toContain('界面展示数据')
+    expect(html).toContain('渠道来源分布')
+    expect(html).toContain('转化漏斗')
     expect(html).toContain('待接入用户 API')
     expect(html).toContain('id="bridge-qr"')
     expect(html).toContain('id="verify-form"')
@@ -224,6 +227,9 @@ describe('BridgeWebControlPlane', () => {
     expect(html).toContain('/api/verify-code')
     expect(html).not.toContain('对话创作')
     expect(html).not.toContain('内容资产')
+    expect(html).not.toContain('常用素材')
+    expect(html).not.toContain('服务状态：')
+    expect(html).not.toContain('Bridge 状态')
     expect(html).not.toContain('Demo 设置')
     expect(html).not.toContain('本地工作空间')
   })
@@ -504,7 +510,7 @@ describe('bridge console routing helpers', () => {
     it('shows all items and the default status when the keyword is empty', () => {
       expect(computeBridgeToolLibraryFilterState(libraryItems, '')).toEqual({
         empty: false,
-        statusText: '展示 4 条运维素材。',
+        statusText: '展示 4 项运维入口。',
         visibleIndexes: [0, 1, 2, 3],
       })
     })
@@ -512,7 +518,7 @@ describe('bridge console routing helpers', () => {
     it('filters matches and reports the matching count', () => {
       expect(computeBridgeToolLibraryFilterState(libraryItems, '节日')).toEqual({
         empty: false,
-        statusText: '找到 1 条与当前关键词相关的运维素材。',
+        statusText: '找到 1 项与当前关键词相关的运维入口。',
         visibleIndexes: [1],
       })
     })
@@ -520,7 +526,7 @@ describe('bridge console routing helpers', () => {
     it('reports an empty state when nothing matches', () => {
       expect(computeBridgeToolLibraryFilterState(libraryItems, '不存在')).toEqual({
         empty: true,
-        statusText: '没有匹配的运维素材，请更换关键词后重试。',
+        statusText: '没有匹配的运维入口，请更换关键词后重试。',
         visibleIndexes: [],
       })
     })
