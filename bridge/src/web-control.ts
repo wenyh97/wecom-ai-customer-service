@@ -1097,10 +1097,14 @@ function renderPage (tokenRequired: boolean): string {
       }
     }
 
+    function hasPermission (permissionKey) {
+      return Boolean(currentUser.permissions[permissionKey] ?? false)
+    }
+
     function applyPermissionGuards () {
       elements.permissionNodes.forEach((node) => {
         const permissionKey = node.getAttribute('data-permission')
-        const allowed = Boolean(currentUser.permissions[permissionKey] ?? false)
+        const allowed = hasPermission(permissionKey)
         if ('disabled' in node) {
           node.disabled = !allowed
         }
@@ -1108,7 +1112,7 @@ function renderPage (tokenRequired: boolean): string {
       })
       permissionDescriptors.forEach((descriptor) => {
         const label = document.getElementById(descriptor.labelId)
-        setText(label, currentUser.permissions[descriptor.key] ? '可管理' : '只读')
+        setText(label, hasPermission(descriptor.key) ? '可管理' : '只读')
       })
     }
 
@@ -1578,6 +1582,11 @@ function renderPage (tokenRequired: boolean): string {
 
     elements.modelConfigForm.addEventListener('submit', (event) => {
       event.preventDefault()
+      if (!hasPermission('manageModels')) {
+        renderModelConfigState('当前账号没有模型配置权限。')
+        elements.modelApiKey.value = ''
+        return
+      }
       Object.assign(modelConfigState, computeNextModelConfigState(modelConfigState, {
         provider: elements.modelProvider.value,
         baseUrl: elements.modelBaseUrl.value,
