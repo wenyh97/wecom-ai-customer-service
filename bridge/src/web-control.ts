@@ -329,10 +329,10 @@ export function computeBridgeToolLibraryFilterState (
   return {
     empty: visibleIndexes.length === 0,
     statusText: visibleIndexes.length === 0
-      ? '没有匹配的运维素材，请更换关键词后重试。'
+      ? '没有匹配的运维入口，请更换关键词后重试。'
       : (normalizedKeyword === ''
-          ? `展示 ${visibleIndexes.length} 条运维素材。`
-          : `找到 ${visibleIndexes.length} 条与当前关键词相关的运维素材。`),
+          ? `展示 ${visibleIndexes.length} 项运维入口。`
+          : `找到 ${visibleIndexes.length} 项与当前关键词相关的运维入口。`),
     visibleIndexes,
   }
 }
@@ -351,8 +351,10 @@ function renderPage (tokenRequired: boolean): string {
       --card: #fffdf9;
       --text: #1e1b18;
       --muted: #6d6257;
+      --muted-strong: #54493f;
       --line: #e0d7cc;
       --accent: #9c4c39;
+      --accent-strong: #7d3727;
       --accent-soft: #eed8d1;
       --success: #266c52;
       --danger: #9f2a2a;
@@ -368,14 +370,26 @@ function renderPage (tokenRequired: boolean): string {
       --space-6: 32px;
     }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); }
+    html, body { height: 100%; }
+    body { margin: 0; font-family: "PingFang SC", "Microsoft YaHei", -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
     button, input, select { font: inherit; }
     button:focus-visible, input:focus-visible, select:focus-visible, .nav-btn:focus-visible, .tab-btn:focus-visible {
       box-shadow: 0 0 0 3px rgba(156, 76, 57, 0.25);
     }
     .hidden { display: none !important; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
     .demo-tag { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; color: var(--muted); background: #fff; }
-    .page-shell { min-height: 100vh; padding: var(--space-4); }
+    .page-shell { height: 100vh; padding: var(--space-4); }
 
     .login-wrap { max-width: 480px; margin: 48px auto; }
     .login-card {
@@ -407,71 +421,114 @@ function renderPage (tokenRequired: boolean): string {
       display: grid;
       grid-template-columns: 280px minmax(0, 1fr);
       gap: var(--space-4);
-      min-height: calc(100vh - var(--space-4) * 2);
+      height: calc(100vh - var(--space-4) * 2);
+      align-items: stretch;
     }
     .sidebar {
       background: var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow);
-      padding: var(--space-4);
+      padding: 20px 18px 18px;
       display: flex;
       flex-direction: column;
       gap: var(--space-4);
       min-height: 0;
+      height: 100%;
+      position: sticky;
+      top: 0;
+      overflow: hidden;
     }
-    .brand h1 { margin: 0; font-size: 22px; }
-    .brand p { margin: 6px 0 0; color: var(--muted); }
-    .nav { display: grid; gap: 8px; flex: 1; align-content: start; overflow: auto; min-height: 0; }
-    .nav-group { display: grid; gap: 8px; }
+    .brand {
+      padding: 2px 4px 4px;
+      border-bottom: 1px solid rgba(224, 215, 204, 0.8);
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      font-weight: 700;
+      color: var(--accent-strong);
+    }
+    .nav { display: grid; gap: 10px; flex: 1; align-content: start; overflow: auto; min-height: 0; padding-right: 4px; }
+    .nav-group { display: grid; gap: 10px; }
     .nav-btn {
       border: 1px solid transparent;
-      border-radius: var(--radius-sm);
+      border-radius: 14px;
       background: transparent;
       color: var(--text);
       text-align: left;
-      padding: 10px 12px;
+      padding: 11px 14px;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
     }
-    .nav-btn.active { background: #fff; border-color: var(--line); color: var(--accent); font-weight: 600; }
+    .nav-btn:hover { background: rgba(255, 255, 255, 0.76); border-color: rgba(224, 215, 204, 0.9); }
+    .nav-btn.active { background: #fff; border-color: rgba(156, 76, 57, 0.16); color: var(--accent-strong); font-weight: 600; box-shadow: 0 12px 24px rgba(156, 76, 57, 0.08); }
     .nav-parent { justify-content: space-between; }
     .nav-label { display: inline-flex; align-items: center; gap: 8px; }
     .nav-caret { color: var(--muted); transition: transform 0.2s ease; }
     .nav-parent[aria-expanded="true"] .nav-caret { transform: rotate(180deg); }
-    .nav-subnav { display: grid; gap: 6px; padding: 0 0 0 12px; margin: 0; list-style: none; }
-    .nav-sub-btn {
-      padding: 8px 12px 8px 36px;
-      color: var(--muted);
-      font-size: 14px;
+    .nav-subnav {
+      display: grid;
+      gap: 8px;
+      padding: 6px 0 0 18px;
+      margin: 0;
+      list-style: none;
+      border-left: 1px solid rgba(156, 76, 57, 0.12);
     }
+    .nav-sub-btn {
+      padding: 10px 12px 10px 14px;
+      color: var(--muted-strong);
+      font-size: 14px;
+      align-items: flex-start;
+      gap: 0;
+      position: relative;
+    }
+    .nav-sub-btn::before {
+      content: "";
+      position: absolute;
+      left: -13px;
+      top: 18px;
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(156, 76, 57, 0.18);
+    }
+    .nav-sub-btn.active::before { background: var(--accent-strong); }
+    .nav-sub-copy { display: grid; gap: 3px; }
+    .nav-sub-title { font-size: 14px; font-weight: 600; line-height: 1.2; }
+    .nav-sub-meta { font-size: 12px; line-height: 1.35; color: var(--muted); }
     .sidebar-foot {
       margin-top: auto;
       border-top: 1px solid var(--line);
-      padding-top: var(--space-3);
+      padding-top: 14px;
       position: relative;
+      flex: none;
     }
     .account-entry { position: relative; }
     .account-trigger {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 14px;
+      border-radius: 16px;
       background: #fff;
       padding: 10px 12px;
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       cursor: pointer;
       text-align: left;
       color: var(--text);
+      min-width: 0;
     }
     .account-avatar {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
-      background: var(--accent-soft);
+      background: linear-gradient(135deg, #f3ddd5, #ead0c7);
       color: var(--accent);
       display: inline-flex;
       align-items: center;
@@ -479,8 +536,7 @@ function renderPage (tokenRequired: boolean): string {
       font-weight: 700;
       flex: none;
     }
-    .account-copy { min-width: 0; display: grid; gap: 4px; flex: 1; }
-    .account-label { font-size: 12px; color: var(--muted); }
+    .account-copy { min-width: 0; display: flex; align-items: center; flex: 1; }
     .account-name {
       font-size: 15px;
       font-weight: 600;
@@ -488,23 +544,6 @@ function renderPage (tokenRequired: boolean): string {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .account-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      font-size: 12px;
-      color: var(--muted);
-    }
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--line);
-      flex: none;
-    }
-    .status-dot.online { background: var(--success); }
-    .status-dot.offline { background: var(--danger); }
     .account-menu {
       position: absolute;
       left: 0;
@@ -514,24 +553,14 @@ function renderPage (tokenRequired: boolean): string {
       border: 1px solid var(--line);
       border-radius: var(--radius-md);
       box-shadow: var(--shadow);
-      padding: var(--space-3);
+      padding: 12px;
       display: grid;
-      gap: var(--space-2);
+      gap: 10px;
       z-index: 20;
     }
-    .menu-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: var(--space-2);
-      font-size: 13px;
-    }
-    .menu-row strong { color: var(--text); }
     .menu-actions {
       display: grid;
       gap: 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--line);
     }
     .menu-btn { width: 100%; }
 
@@ -540,17 +569,39 @@ function renderPage (tokenRequired: boolean): string {
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+      overflow: hidden;
+    }
+    .content-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
       padding: var(--space-4);
       display: grid;
-      grid-template-rows: auto 1fr;
       gap: var(--space-4);
-      min-height: 0;
     }
-    .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border-bottom: 1px solid var(--line); padding-bottom: var(--space-3); }
-    .topbar h2 { margin: 0; font-size: 28px; }
+    .content-notice {
+      margin: 0;
+      border-bottom: 1px solid rgba(224, 215, 204, 0.8);
+      padding: 12px var(--space-4);
+      color: var(--accent-strong);
+      background: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+    }
 
     .page { display: none; }
     .page.active { display: block; }
+    .page-section-title {
+      margin: 0 0 12px;
+      font-size: 16px;
+      line-height: 1.35;
+      font-weight: 600;
+      color: var(--muted-strong);
+      letter-spacing: 0.01em;
+    }
     .grid { display: grid; gap: var(--space-3); }
     .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -609,20 +660,112 @@ function renderPage (tokenRequired: boolean): string {
     .metric-value { margin: 8px 0 0; font-size: 26px; color: var(--text); font-weight: 600; }
     .state-card { display: grid; gap: 8px; }
     .empty-box { border: 1px dashed var(--line); border-radius: var(--radius-sm); padding: var(--space-3); background: #fff; }
+    .stat-card {
+      background: linear-gradient(180deg, #fffdf9 0%, #fff7f2 100%);
+      box-shadow: 0 14px 28px rgba(46, 35, 27, 0.04);
+    }
+    .metric-caption { margin-top: 10px; font-size: 12px; color: var(--muted); }
+    .metric-trend { margin-top: 8px; font-size: 13px; color: var(--accent-strong); }
+    .stats-section-grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mini-bar-list, .funnel-list, .insight-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+    .mini-bar-list li, .funnel-list li, .insight-list li { display: grid; gap: 6px; }
+    .mini-bar-meta, .funnel-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted-strong); }
+    .mini-bar-track, .funnel-track {
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(224, 215, 204, 0.72);
+      overflow: hidden;
+    }
+    .mini-bar-fill, .funnel-fill {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #d9846c, #9c4c39);
+    }
+    .donut-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); }
+    .donut-card { display: grid; justify-items: center; gap: 10px; text-align: center; }
+    .donut-ring {
+      --ratio: 0deg;
+      width: 98px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: conic-gradient(var(--accent) var(--ratio), rgba(238, 216, 209, 0.72) 0deg);
+      display: grid;
+      place-items: center;
+    }
+    .donut-ring::after {
+      content: "";
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: var(--card);
+      box-shadow: inset 0 0 0 1px rgba(224, 215, 204, 0.58);
+      grid-area: 1 / 1;
+    }
+    .donut-ring span {
+      grid-area: 1 / 1;
+      position: relative;
+      z-index: 1;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-strong);
+    }
+    .insight-list strong { color: var(--text); }
+    .insight-list span { color: var(--muted); }
+    .stats-note {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+    }
+    .stats-note p { max-width: 760px; }
+    .realtime-grid { display: grid; gap: var(--space-3); grid-template-columns: 1.05fr 1fr; }
+    .realtime-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+    .realtime-list li { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); }
+    .realtime-list strong { color: var(--text); }
+    .timeline-list.hidden { display: none !important; }
+
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(156, 76, 57, 0.45) rgba(224, 215, 204, 0.5);
+    }
+    .nav::-webkit-scrollbar, .content-scroll::-webkit-scrollbar, .account-menu::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    .nav::-webkit-scrollbar-track, .content-scroll::-webkit-scrollbar-track, .account-menu::-webkit-scrollbar-track {
+      background: rgba(224, 215, 204, 0.5);
+      border-radius: 999px;
+    }
+    .nav::-webkit-scrollbar-thumb, .content-scroll::-webkit-scrollbar-thumb, .account-menu::-webkit-scrollbar-thumb {
+      background: rgba(156, 76, 57, 0.42);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .nav::-webkit-scrollbar-thumb:hover, .content-scroll::-webkit-scrollbar-thumb:hover, .account-menu::-webkit-scrollbar-thumb:hover {
+      background: rgba(156, 76, 57, 0.62);
+      background-clip: padding-box;
+    }
 
     @media (max-width: 1024px) {
-      .grid.three, .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.three, .metric-grid, .donut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .stats-section-grid, .realtime-grid { grid-template-columns: 1fr; }
     }
     @media (max-width: 860px) {
+      body { overflow: auto; }
       .page-shell { padding: var(--space-2); }
-      .app { grid-template-columns: 1fr; }
-      .sidebar { gap: var(--space-3); }
+      .app { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - var(--space-2) * 2); }
+      .sidebar { gap: var(--space-3); position: static; height: auto; }
       .nav { grid-template-columns: 1fr; overflow: visible; }
-      .nav-btn { font-size: 13px; padding: 8px 10px; }
-      .nav-subnav { padding-left: 0; }
-      .nav-sub-btn { padding-left: 18px; }
-      .grid.two, .grid.three, .metric-grid { grid-template-columns: 1fr; }
-      .topbar { flex-direction: column; align-items: flex-start; }
+      .nav-btn { font-size: 13px; padding: 9px 11px; }
+      .nav-subnav { padding-left: 12px; }
+      .nav-sub-btn { padding-left: 12px; }
+      .grid.two, .grid.three, .metric-grid, .donut-grid { grid-template-columns: 1fr; }
+      .content { min-height: 0; }
+      .content-scroll { overflow: visible; }
       .account-menu { position: static; margin-top: 8px; }
     }
   </style>
@@ -652,8 +795,7 @@ function renderPage (tokenRequired: boolean): string {
     <section id="app-screen" class="app hidden" aria-live="polite">
       <aside class="sidebar">
         <header class="brand">
-          <p>企业微信客户运营中台</p>
-          <h1>AI企微客户运营</h1>
+          <h1>AI企微客户运营中台</h1>
         </header>
         <nav class="nav" aria-label="工作台导航">
           <button class="nav-btn active" data-nav="account" type="button">🔗 账号链接</button>
@@ -666,10 +808,10 @@ function renderPage (tokenRequired: boolean): string {
               <span class="nav-caret" aria-hidden="true">▾</span>
             </button>
             <ul id="settings-nav-panel" class="nav-subnav hidden" aria-label="设置子导航">
-              <li><button class="nav-btn nav-sub-btn" data-nav="model-config" type="button">模型配置</button></li>
-              <li><button class="nav-btn nav-sub-btn" data-nav="people" type="button">人员管理</button></li>
-              <li><button class="nav-btn nav-sub-btn" data-nav="teams" type="button">团队管理</button></li>
-              <li><button class="nav-btn nav-sub-btn" data-nav="permissions" type="button">权限管理</button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="model-config" type="button"><span class="nav-sub-copy"><span class="nav-sub-title">模型配置</span><span class="nav-sub-meta">模型接入、启用状态与密钥管理</span></span></button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="people" type="button"><span class="nav-sub-copy"><span class="nav-sub-title">人员管理</span><span class="nav-sub-meta">查看成员角色、状态与协作分工</span></span></button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="teams" type="button"><span class="nav-sub-copy"><span class="nav-sub-title">团队管理</span><span class="nav-sub-meta">组织分组、负责人和服务范围配置</span></span></button></li>
+              <li><button class="nav-btn nav-sub-btn" data-nav="permissions" type="button"><span class="nav-sub-copy"><span class="nav-sub-title">权限管理</span><span class="nav-sub-meta">角色授权、策略说明与访问控制</span></span></button></li>
             </ul>
           </div>
         </nav>
@@ -678,19 +820,11 @@ function renderPage (tokenRequired: boolean): string {
             <button id="account-menu-trigger" class="account-trigger" type="button" aria-expanded="false" aria-controls="account-menu-panel">
               <span class="account-avatar" aria-hidden="true">A</span>
               <span class="account-copy">
-                <span class="account-label">当前用户</span>
                 <span class="account-name">admin</span>
-                <span class="account-meta">
-                  <span id="account-status-dot" class="status-dot offline" aria-hidden="true"></span>
-                  <span id="account-status-summary">服务状态：启动中 · Bridge：starting</span>
-                </span>
               </span>
               <span class="nav-caret" aria-hidden="true">▾</span>
             </button>
             <div id="account-menu-panel" class="account-menu hidden" aria-label="账户菜单">
-              <div class="menu-row"><strong>当前用户</strong><span>admin</span></div>
-              <div class="menu-row"><strong>服务状态</strong><span id="service-status">启动中</span></div>
-              <div class="menu-row"><strong>Bridge 状态</strong><span id="sidebar-bridge-phase">starting</span></div>
               <div class="menu-actions">
                 <button id="logout-btn" type="button" class="btn btn-secondary menu-btn">退出登录</button>
               </div>
@@ -700,15 +834,14 @@ function renderPage (tokenRequired: boolean): string {
       </aside>
 
       <section class="content">
-        <header class="topbar">
-          <div>
-            <h2 id="page-title" tabindex="-1">账号链接</h2>
-            <p class="muted" id="page-subtitle">统一管理企业微信账号绑定、扫码登录与验证码校验。</p>
-          </div>
-        </header>
-
-        <div>
-          <section id="page-account" class="page active">
+        <div class="sr-only" aria-live="polite" aria-atomic="true">
+          <h2 id="page-title">账号链接</h2>
+          <p class="muted" id="page-subtitle">统一管理企业微信账号绑定、扫码登录与验证码校验。</p>
+        </div>
+        <p id="content-notice" class="content-notice hidden" role="status" aria-live="polite"></p>
+        <div class="content-scroll">
+          <section id="page-account" class="page active" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">账号链接</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -750,13 +883,14 @@ function renderPage (tokenRequired: boolean): string {
             </div>
           </section>
 
-          <section id="page-tools" class="page">
+          <section id="page-tools" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">工具</h2>
             <article class="card">
               <div class="section-head">
                 <h3>工具中心</h3>
                 <span class="status-pill">按能力分组访问</span>
               </div>
-              <p class="muted">运维工具已收纳节日问候、产品介绍、FAQ 等常用能力，可继续通过标签、搜索和原有入口完成操作。</p>
+              <p class="muted">运维工具已整合节日问候、产品介绍、FAQ 等扩展能力，可继续通过分组、搜索和兼容入口快速访问。</p>
 
               <section id="tool-group-operations" class="tool-group active">
                 <div class="card">
@@ -772,48 +906,49 @@ function renderPage (tokenRequired: boolean): string {
                     <article class="card"><h3>🧠 AI 客户画像分析</h3><p>识别客户意向、偏好和生命周期。</p><button class="btn btn-secondary tool-btn" data-tool="AI 客户画像分析" type="button">查看能力</button></article>
                     <article class="card"><h3>📈 AI 老客维护策略推荐</h3><p>提供复购、关怀和沉睡唤醒建议。</p><button class="btn btn-secondary tool-btn" data-tool="AI 老客维护策略推荐" type="button">查看能力</button></article>
                   </div>
-                </div>
-                <div id="tool-library-section" class="card" style="margin-top: 16px;">
-                  <div class="section-head">
-                    <h3>常用素材</h3>
-                    <span class="status-pill">运维工具子功能</span>
+                  <div id="tool-library-section" class="card" style="margin-top: 16px;">
+                    <div class="section-head">
+                      <h3>运维扩展入口</h3>
+                      <span class="status-pill">兼容旧路径</span>
+                    </div>
+                    <p class="muted">节日问候、产品介绍、FAQ 已归入运维工具子功能，保留原有能力入口与搜索方式。</p>
+                    <input id="tool-library-search" class="input" type="search" placeholder="搜索运维入口，如：节日 / FAQ">
+                    <p id="tool-library-status" class="muted" role="status" aria-live="polite" style="margin-top: 12px;">展示 4 项运维入口。</p>
+                    <div id="tool-library-list" class="grid two" style="margin-top: 12px;">
+                      <article class="card tool-library-item" data-title="欢迎语模板" data-tags="欢迎 新客 开场">
+                        <h3>欢迎语模板</h3>
+                        <p>用于首次触达新客户的标准开场。</p>
+                        <div class="tags"><span class="tag">欢迎</span><span class="tag">新客</span></div>
+                        <button class="btn btn-secondary tool-btn" data-tool="欢迎语模板" type="button">查看能力</button>
+                      </article>
+                      <article class="card tool-library-item" data-title="节日问候" data-tags="节日 关怀 活动">
+                        <h3>节日问候</h3>
+                        <p>用于节日关怀、活动通知和老客唤醒场景。</p>
+                        <div class="tags"><span class="tag">节日</span><span class="tag">关怀</span></div>
+                        <button class="btn btn-secondary tool-btn" data-tool="节日问候" type="button">查看能力</button>
+                      </article>
+                      <article class="card tool-library-item" data-title="产品介绍" data-tags="产品 卖点 话术">
+                        <h3>产品介绍</h3>
+                        <p>集中展示核心卖点、资料摘要与标准讲解话术。</p>
+                        <div class="tags"><span class="tag">产品</span><span class="tag">卖点</span></div>
+                        <button class="btn btn-secondary tool-btn" data-tool="产品介绍" type="button">查看能力</button>
+                      </article>
+                      <article class="card tool-library-item" data-title="FAQ" data-tags="FAQ 问答 客服">
+                        <h3>FAQ</h3>
+                        <p>归档高频问题与统一答复口径，便于客服快速调用。</p>
+                        <div class="tags"><span class="tag">FAQ</span><span class="tag">客服</span></div>
+                        <button class="btn btn-secondary tool-btn" data-tool="FAQ" type="button">查看能力</button>
+                      </article>
+                    </div>
+                    <div id="tool-library-empty" class="empty-box hidden" style="margin-top: 12px;">没有匹配的运维入口，请更换关键词后重试。</div>
                   </div>
-                  <p class="muted">原有模板和问答能力已移动到运维工具下，入口与搜索方式保持可用。</p>
-                  <input id="tool-library-search" class="input" type="search" placeholder="搜索模板或标签，如：节日 / FAQ">
-                  <p id="tool-library-status" class="muted" role="status" aria-live="polite" style="margin-top: 12px;">展示 4 条运维素材。</p>
-                  <div id="tool-library-list" class="grid two" style="margin-top: 12px;">
-                    <article class="card tool-library-item" data-title="欢迎语模板" data-tags="欢迎 新客 开场">
-                      <h3>欢迎语模板</h3>
-                      <p>用于首次触达新客户的标准开场。</p>
-                      <div class="tags"><span class="tag">欢迎</span><span class="tag">新客</span></div>
-                      <button class="btn btn-secondary tool-btn" data-tool="欢迎语模板" type="button">查看能力</button>
-                    </article>
-                    <article class="card tool-library-item" data-title="节日问候" data-tags="节日 关怀 活动">
-                      <h3>节日问候</h3>
-                      <p>中秋、国庆等节日场景模板集合。</p>
-                      <div class="tags"><span class="tag">节日</span><span class="tag">关怀</span></div>
-                      <button class="btn btn-secondary tool-btn" data-tool="节日问候" type="button">查看能力</button>
-                    </article>
-                    <article class="card tool-library-item" data-title="产品介绍" data-tags="产品 卖点 话术">
-                      <h3>产品介绍</h3>
-                      <p>核心产品卖点与常见提问答复。</p>
-                      <div class="tags"><span class="tag">产品</span><span class="tag">卖点</span></div>
-                      <button class="btn btn-secondary tool-btn" data-tool="产品介绍" type="button">查看能力</button>
-                    </article>
-                    <article class="card tool-library-item" data-title="FAQ" data-tags="FAQ 问答 客服">
-                      <h3>FAQ</h3>
-                      <p>高频问题的统一回答示例。</p>
-                      <div class="tags"><span class="tag">FAQ</span><span class="tag">客服</span></div>
-                      <button class="btn btn-secondary tool-btn" data-tool="FAQ" type="button">查看能力</button>
-                    </article>
-                  </div>
-                  <div id="tool-library-empty" class="empty-box hidden" style="margin-top: 12px;">没有匹配的运维素材，请更换关键词后重试。</div>
                 </div>
               </section>
             </article>
           </section>
 
-          <section id="page-rag" class="page">
+          <section id="page-rag" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">AI 知识库（RAG）</h2>
             <article class="card">
               <div class="section-head">
                 <h3>AI 知识库（RAG）</h3>
@@ -838,13 +973,17 @@ function renderPage (tokenRequired: boolean): string {
             </article>
           </section>
 
-          <section id="page-stats" class="page">
+          <section id="page-stats" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">数据统计</h2>
             <article class="card">
               <div class="section-head">
                 <h3>数据统计</h3>
                 <span id="stats-sync-state" class="status-pill">同步中</span>
               </div>
-              <p class="muted">当前页面基于 Bridge 实时状态展示可验证的运营指标；客户、会话、消息、回复和转化等业务统计在后端接口接入前会明确标记为“待接入”。</p>
+              <div class="stats-note">
+                <p class="muted">以下运营指标为界面展示数据，用于呈现渠道、会话、客户、消息与转化视图；连接状态、扫码与验证码相关信息仍以下方实时同步结果为准。</p>
+                <span class="status-pill">界面展示数据</span>
+              </div>
               <div id="stats-loading" class="card state-card" style="margin-top: 12px;">
                 <h3>统计加载中</h3>
                 <p>正在获取 Bridge 实时状态与最近事件。</p>
@@ -855,40 +994,99 @@ function renderPage (tokenRequired: boolean): string {
               </div>
               <div id="stats-content" class="grid hidden" style="margin-top: 12px;">
                 <div class="metric-grid">
-                  <article class="card"><h3>当前状态</h3><p class="metric-value" id="stats-current-phase">-</p></article>
-                  <article class="card"><h3>状态事件数</h3><p class="metric-value" id="stats-event-count">0</p><p>按本次页面会话聚合</p></article>
-                  <article class="card"><h3>验证码请求</h3><p class="metric-value" id="stats-verify-count">0</p><p>基于实时状态事件统计</p></article>
-                  <article class="card"><h3>扫码请求</h3><p class="metric-value" id="stats-scan-count">0</p><p>二维码刷新事件累计</p></article>
-                  <article class="card"><h3>绑定账号</h3><p class="metric-value" id="stats-account-user">未绑定</p></article>
-                  <article class="card"><h3>最近同步</h3><p class="metric-value" id="stats-last-updated">-</p></article>
+                  <article class="card stat-card"><h3>今日会话总量</h3><p class="metric-value">382</p><p class="metric-caption">多渠道接待与营销跟进合计</p><p class="metric-trend">较近 7 日均值 +12.4%</p></article>
+                  <article class="card stat-card"><h3>新增客户</h3><p class="metric-value">46</p><p class="metric-caption">来自私域沉淀、活动扫码与转介绍</p><p class="metric-trend">私域渠道贡献 61%</p></article>
+                  <article class="card stat-card"><h3>AI 回复占比</h3><p class="metric-value">78%</p><p class="metric-caption">高频问答自动接待覆盖率</p><p class="metric-trend">FAQ 与快捷回复稳定提升</p></article>
+                  <article class="card stat-card"><h3>人工接管率</h3><p class="metric-value">14%</p><p class="metric-caption">复杂咨询与重点客户人工承接</p><p class="metric-trend">高意向客户优先转人工</p></article>
+                  <article class="card stat-card"><h3>线索转化</h3><p class="metric-value">23</p><p class="metric-caption">进入重点跟进池的客户线索数</p><p class="metric-trend">转化效率环比 +8.1%</p></article>
+                  <article class="card stat-card"><h3>客户满意度</h3><p class="metric-value">96%</p><p class="metric-caption">基于话术规范、响应时效与回访结果</p><p class="metric-trend">老客维护表现稳定</p></article>
                 </div>
-                <article class="card">
-                  <div class="section-head">
-                    <h3>状态时间序列</h3>
-                    <span class="status-pill">实时事件</span>
-                  </div>
-                  <div id="stats-timeline-empty" class="empty-box">暂无状态事件，等待 Bridge 推送或手动刷新。</div>
-                  <ul id="stats-timeline" class="timeline-list hidden"></ul>
-                </article>
-                <article class="card">
-                  <div class="section-head">
-                    <h3>业务统计接入状态</h3>
-                    <span class="status-pill">明确区分已接入 / 待接入</span>
-                  </div>
-                  <div class="grid three">
-                    <article class="card"><h3>客户数</h3><p class="metric-value">待接入</p><p>当前控制台未提供客户统计接口。</p></article>
-                    <article class="card"><h3>会话数</h3><p class="metric-value">待接入</p><p>待复用会话业务 API 后展示。</p></article>
-                    <article class="card"><h3>消息量</h3><p class="metric-value">待接入</p><p>待接入消息明细或聚合接口。</p></article>
-                    <article class="card"><h3>AI 回复率</h3><p class="metric-value">待接入</p><p>待接入 AI 回复统计口径。</p></article>
-                    <article class="card"><h3>转人工率</h3><p class="metric-value">待接入</p><p>待接入人工接管统计接口。</p></article>
-                    <article class="card"><h3>转化效果</h3><p class="metric-value">待接入</p><p>待接入运营转化或回访结果数据。</p></article>
-                  </div>
-                </article>
+                <div class="stats-section-grid">
+                  <article class="card">
+                    <div class="section-head">
+                      <h3>渠道来源分布</h3>
+                      <span class="status-pill">近 7 日</span>
+                    </div>
+                    <ul class="mini-bar-list">
+                      <li><div class="mini-bar-meta"><strong>企业微信私域</strong><span>68%</span></div><div class="mini-bar-track"><span class="mini-bar-fill" style="width:68%"></span></div></li>
+                      <li><div class="mini-bar-meta"><strong>活动拉新</strong><span>17%</span></div><div class="mini-bar-track"><span class="mini-bar-fill" style="width:17%"></span></div></li>
+                      <li><div class="mini-bar-meta"><strong>老客复购</strong><span>9%</span></div><div class="mini-bar-track"><span class="mini-bar-fill" style="width:9%"></span></div></li>
+                      <li><div class="mini-bar-meta"><strong>转介绍</strong><span>6%</span></div><div class="mini-bar-track"><span class="mini-bar-fill" style="width:6%"></span></div></li>
+                    </ul>
+                  </article>
+                  <article class="card">
+                    <div class="section-head">
+                      <h3>客户结构占比</h3>
+                      <span class="status-pill">当前展示</span>
+                    </div>
+                    <div class="donut-grid">
+                      <div class="donut-card"><div class="donut-ring" role="img" aria-label="新客激活占比 70%，首次触达后 24 小时内保持响应" style="--ratio:252deg"><span aria-hidden="true">70%</span></div><div><strong>新客激活</strong><p>首次触达后 24 小时内保持响应</p></div></div>
+                      <div class="donut-card"><div class="donut-ring" role="img" aria-label="重点跟进占比 40%，进入高意向池并持续追踪" style="--ratio:144deg"><span aria-hidden="true">40%</span></div><div><strong>重点跟进</strong><p>进入高意向池并持续追踪</p></div></div>
+                      <div class="donut-card"><div class="donut-ring" role="img" aria-label="老客复购占比 26%，维护周期内再次成交占比" style="--ratio:94deg"><span aria-hidden="true">26%</span></div><div><strong>老客复购</strong><p>维护周期内再次成交占比</p></div></div>
+                    </div>
+                  </article>
+                </div>
+                <div class="realtime-grid">
+                  <article class="card">
+                    <div class="section-head">
+                      <h3>实时连接概览</h3>
+                      <span class="status-pill">Bridge 同步</span>
+                    </div>
+                    <ul class="realtime-list">
+                      <li><strong>当前状态</strong><span id="stats-current-phase">-</span></li>
+                      <li><strong>状态事件数</strong><span id="stats-event-count">0</span></li>
+                      <li><strong>验证码请求</strong><span id="stats-verify-count">0</span></li>
+                      <li><strong>扫码请求</strong><span id="stats-scan-count">0</span></li>
+                      <li><strong>绑定账号</strong><span id="stats-account-user">未绑定</span></li>
+                      <li><strong>最近同步</strong><span id="stats-last-updated">-</span></li>
+                    </ul>
+                    <div id="stats-timeline-empty" class="empty-box" style="margin-top: 14px;">暂无状态事件，等待 Bridge 推送或手动刷新。</div>
+                    <ul id="stats-timeline" class="timeline-list hidden" style="margin-top: 14px;"></ul>
+                  </article>
+                  <article class="card">
+                    <div class="section-head">
+                      <h3>转化漏斗</h3>
+                      <span class="status-pill">运营重点</span>
+                    </div>
+                    <ul class="funnel-list">
+                      <li><div class="funnel-meta"><strong>触达客户</strong><span>1,280</span></div><div class="funnel-track"><span class="funnel-fill" style="width:100%"></span></div></li>
+                      <li><div class="funnel-meta"><strong>有效对话</strong><span>864</span></div><div class="funnel-track"><span class="funnel-fill" style="width:67%"></span></div></li>
+                      <li><div class="funnel-meta"><strong>高意向线索</strong><span>219</span></div><div class="funnel-track"><span class="funnel-fill" style="width:38%"></span></div></li>
+                      <li><div class="funnel-meta"><strong>跟进预约</strong><span>74</span></div><div class="funnel-track"><span class="funnel-fill" style="width:22%"></span></div></li>
+                      <li><div class="funnel-meta"><strong>成交转化</strong><span>23</span></div><div class="funnel-track"><span class="funnel-fill" style="width:11%"></span></div></li>
+                    </ul>
+                  </article>
+                </div>
+                <div class="stats-section-grid">
+                  <article class="card">
+                    <div class="section-head">
+                      <h3>消息质量观察</h3>
+                      <span class="status-pill">会话维度</span>
+                    </div>
+                    <ul class="insight-list">
+                      <li><strong>平均首响时长</strong><span>22 秒，热点活动时段保持在 30 秒内</span></li>
+                      <li><strong>高频咨询主题</strong><span>产品报价、活动权益、交付周期、售后流程</span></li>
+                      <li><strong>快捷回复采用率</strong><span>63%，高峰时段显著降低人工输入负担</span></li>
+                    </ul>
+                  </article>
+                  <article class="card">
+                    <div class="section-head">
+                      <h3>运营建议看板</h3>
+                      <span class="status-pill">建议动作</span>
+                    </div>
+                    <ul class="insight-list">
+                      <li><strong>渠道优化</strong><span>继续提升活动拉新后的 2 小时首触达覆盖，避免线索降温。</span></li>
+                      <li><strong>客户分层</strong><span>将连续 3 次互动的客户自动推送给重点跟进团队，缩短成单周期。</span></li>
+                      <li><strong>内容补齐</strong><span>优先补充 FAQ 和产品介绍中关于价格异议处理的话术模板。</span></li>
+                    </ul>
+                  </article>
+                </div>
               </div>
             </article>
           </section>
 
-          <section id="page-model-config" class="page">
+          <section id="page-model-config" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">模型配置</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -940,7 +1138,8 @@ function renderPage (tokenRequired: boolean): string {
             </div>
           </section>
 
-          <section id="page-people" class="page">
+          <section id="page-people" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">人员管理</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -962,7 +1161,8 @@ function renderPage (tokenRequired: boolean): string {
             </div>
           </section>
 
-          <section id="page-teams" class="page">
+          <section id="page-teams" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">团队管理</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -984,7 +1184,8 @@ function renderPage (tokenRequired: boolean): string {
             </div>
           </section>
 
-          <section id="page-permissions" class="page">
+          <section id="page-permissions" class="page" tabindex="-1">
+            <h2 class="page-section-title" data-page-heading tabindex="-1">权限管理</h2>
             <div class="grid two">
               <article class="card">
                 <div class="section-head">
@@ -1069,9 +1270,9 @@ function renderPage (tokenRequired: boolean): string {
 
     const pageMeta = {
       account: { title: '账号链接', subtitle: '统一管理企业微信账号绑定、扫码登录与验证码校验。' },
-      tools: { title: '工具', subtitle: '运维工具已收纳节日问候、产品介绍、FAQ 等常用能力。' },
+      tools: { title: '工具', subtitle: '运维工具已整合节日问候、产品介绍、FAQ 等扩展能力。' },
       rag: { title: 'AI 知识库（RAG）', subtitle: '保留知识库入口，检索结果与指标待后端接口接入。' },
-      stats: { title: '数据统计', subtitle: '优先展示可验证的实时状态与待接入业务统计。' },
+      stats: { title: '数据统计', subtitle: '展示渠道、会话、客户、消息与转化视图，并保留 Bridge 实时状态同步。' },
       'model-config': { title: '模型配置', subtitle: '支持编辑当前页临时配置，敏感密钥默认脱敏。' },
       people: { title: '人员管理', subtitle: '预留用户管理信息架构，待接入真实用户 API。' },
       teams: { title: '团队管理', subtitle: '预留团队协作结构，待接入真实组织 API。' },
@@ -1101,6 +1302,8 @@ function renderPage (tokenRequired: boolean): string {
       loginError: document.getElementById('login-error'),
       pageTitle: document.getElementById('page-title'),
       pageSubtitle: document.getElementById('page-subtitle'),
+      contentNotice: document.getElementById('content-notice'),
+      contentScroll: document.querySelector('.content-scroll'),
       settingsNavToggle: document.getElementById('settings-nav-toggle'),
       settingsNavPanel: document.getElementById('settings-nav-panel'),
       navButtons: Array.from(document.querySelectorAll('.nav-btn')),
@@ -1109,10 +1312,6 @@ function renderPage (tokenRequired: boolean): string {
       logoutBtn: document.getElementById('logout-btn'),
       accountMenuTrigger: document.getElementById('account-menu-trigger'),
       accountMenuPanel: document.getElementById('account-menu-panel'),
-      accountStatusDot: document.getElementById('account-status-dot'),
-      accountStatusSummary: document.getElementById('account-status-summary'),
-      serviceStatus: document.getElementById('service-status'),
-      sidebarBridgePhase: document.getElementById('sidebar-bridge-phase'),
       bridgePhase: document.getElementById('bridge-phase'),
       bridgeMessage: document.getElementById('bridge-message'),
       bridgeUpdatedAt: document.getElementById('bridge-updated-at'),
@@ -1182,6 +1381,16 @@ function renderPage (tokenRequired: boolean): string {
     function setText (element, value) {
       if (!element) return
       element.textContent = value
+    }
+
+    function setContentNotice (message) {
+      if (!message) {
+        setText(elements.contentNotice, '')
+        setHidden(elements.contentNotice, true)
+        return
+      }
+      setText(elements.contentNotice, message)
+      setHidden(elements.contentNotice, false)
     }
 
     function setLoginError (message) {
@@ -1276,7 +1485,9 @@ function renderPage (tokenRequired: boolean): string {
 
     function setActivePage (pageKey, options) {
       const settings = options || {}
+      const previousPage = selectedPage
       selectedPage = normalizeRoute(pageKey)
+      const pageChanged = previousPage !== selectedPage
       if (isSettingsPage(selectedPage)) {
         settingsExpanded = true
       }
@@ -1295,8 +1506,14 @@ function renderPage (tokenRequired: boolean): string {
         syncLocationHash()
       }
       document.title = productName
-      if (settings.focus !== false) {
-        elements.pageTitle.focus()
+      if (pageChanged || settings.focus === true) {
+        const activeHeading = document.querySelector('#page-' + selectedPage + ' [data-page-heading]')
+        if (activeHeading && typeof activeHeading.focus === 'function') {
+          activeHeading.focus()
+        }
+      }
+      if (pageChanged && elements.contentScroll) {
+        elements.contentScroll.scrollTop = 0
       }
     }
 
@@ -1331,11 +1548,6 @@ function renderPage (tokenRequired: boolean): string {
       if (feedback) {
         setText(elements.modelConfigFeedback, feedback)
       }
-    }
-
-    function getPhaseLabel (status) {
-      const onlinePhases = ['ready', 'logged-in', 'verify-code-submitted', 'waiting-verify-code', 'waiting-scan']
-      return onlinePhases.includes(status.phase) ? '在线' : '离线/启动中'
     }
 
     function getAccountNextStep (status) {
@@ -1408,9 +1620,7 @@ function renderPage (tokenRequired: boolean): string {
     }
 
     function updateBridgeCards (status) {
-      const phaseLabel = getPhaseLabel(status)
       setText(elements.bridgePhase, status.phase)
-      setText(elements.sidebarBridgePhase, status.phase)
       setText(elements.bridgeMessage, status.message)
       setText(elements.bridgeUpdatedAt, status.lastUpdatedAt)
       setText(elements.bridgeQrStatus, status.qrCodeStatus == null ? '-' : String(status.qrCodeStatus))
@@ -1418,11 +1628,8 @@ function renderPage (tokenRequired: boolean): string {
         ? '-'
         : [status.loginUser.name, status.loginUser.id].filter(Boolean).join(' / ') || '-'
       setText(elements.bridgeLoginUser, loginUser)
-      setText(elements.serviceStatus, phaseLabel)
-      setText(elements.accountStatusSummary, '服务状态：' + phaseLabel + ' · Bridge：' + status.phase)
-      elements.accountStatusDot.classList.toggle('online', phaseLabel === '在线')
-      elements.accountStatusDot.classList.toggle('offline', phaseLabel !== '在线')
       updateAccountSummary(status)
+      setContentNotice('')
 
       const signature = JSON.stringify({
         phase: status.phase,
@@ -1468,6 +1675,31 @@ function renderPage (tokenRequired: boolean): string {
         elements.verifyCode.value = ''
         setVerifyFeedback('', '')
       }
+    }
+
+    function renderBridgeErrorState (message) {
+      const errorStatus = {
+        phase: 'error',
+        message,
+        lastUpdatedAt: new Date().toISOString(),
+        qrCodeSvg: null,
+        qrCodeStatus: null,
+        qrCodeUpdatedAt: null,
+        loginUser: null,
+        verifyCode: null,
+      }
+      setText(elements.bridgePhase, errorStatus.phase)
+      setText(elements.bridgeMessage, errorStatus.message)
+      setText(elements.bridgeUpdatedAt, errorStatus.lastUpdatedAt)
+      setText(elements.bridgeQrStatus, '-')
+      setText(elements.bridgeLoginUser, '-')
+      elements.bridgeQr.textContent = '当前没有可展示的二维码。'
+      elements.bridgeQr.classList.add('muted')
+      latestRequestId = null
+      setHidden(elements.verifyWrap, true)
+      elements.verifyCode.value = ''
+      setVerifyFeedback('', '')
+      updateAccountSummary(errorStatus)
     }
 
     function renderQrSvgAsImage (svg) {
@@ -1661,7 +1893,7 @@ function renderPage (tokenRequired: boolean): string {
         }
         applyLogoutState()
       } catch (error) {
-        setText(elements.pageSubtitle, error instanceof Error ? error.message : String(error))
+        setContentNotice(error instanceof Error ? error.message : String(error))
       } finally {
         elements.logoutBtn.disabled = false
       }
@@ -1879,11 +2111,9 @@ function renderPage (tokenRequired: boolean): string {
         return
       }
       showAppScreen()
-      setText(elements.serviceStatus, '初始化失败')
-      setText(elements.accountStatusSummary, '服务状态：初始化失败 · Bridge：error')
-      elements.accountStatusDot.classList.remove('online')
-      elements.accountStatusDot.classList.add('offline')
-      setText(elements.pageSubtitle, message)
+      renderBridgeErrorState(message)
+      renderStatsError(message)
+      setContentNotice(message)
     })
   </script>
 </body>
