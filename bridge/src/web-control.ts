@@ -1229,8 +1229,8 @@ function renderPage (tokenRequired: boolean): string {
           at: status.lastUpdatedAt,
         })
         statsState.history = statsState.history.slice(0, 20)
+        renderStatsSuccess(status)
       }
-      renderStatsSuccess(status)
 
       if (typeof status.qrCodeSvg === 'string' && status.qrCodeSvg.trim() !== '') {
         renderQrSvgAsImage(status.qrCodeSvg)
@@ -1599,12 +1599,13 @@ function renderPage (tokenRequired: boolean): string {
     function applyRouteState (focusPageTitle) {
       const route = deriveRouteState()
       setActiveToolGroup(route.toolGroup)
-      setActivePage(route.page, { updateHash: false, focus: focusPageTitle })
+      setActivePage(route.page, { updateHash: false, focus: focusPageTitle && !route.scrollToAssets })
       if (focusPageTitle && route.scrollToAssets) {
         const assetSection = document.getElementById('tools-assets-section')
         if (assetSection) {
           assetSection.scrollIntoView({ block: 'start' })
         }
+        elements.assetSearch.focus()
       }
     }
 
